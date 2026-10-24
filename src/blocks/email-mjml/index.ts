@@ -142,7 +142,7 @@ function containerBg(block: BlockNode, nested: boolean): string {
 /** One block as MJML content elements (inside an mj-column). `width` is the available px width. */
 function renderElement(block: BlockNode, ctx: RenderContext, width: number, nested: boolean): string {
   const { input, theme } = ctx;
-  const padding = resolveBlockPadding(block, input.document.root.style, nested);
+  const padding = resolveBlockPadding(block, input.document, nested);
   const bg = containerBg(block, nested);
 
   switch (block.type) {
@@ -231,7 +231,7 @@ function spacerSection(height: number, background: string): string {
 function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
   const { document } = ctx.input;
   const widths = columnWidths(block.props.layout);
-  const padding = resolveBlockPadding(block, document.root.style, false);
+  const padding = resolveBlockPadding(block, document, false);
   const inner = Math.max(1, ctx.cardWidth - padding.left - padding.right);
   const half = block.props.gap / 2;
   const lastIndex = widths.length - 1;
@@ -253,11 +253,6 @@ function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
   return section(body, block.style.backgroundColor ?? ctx.theme.cardColor, padding);
 }
 
-/** A full-width image at the very top acts as a banner, so the space above the first block is skipped. */
-function isFullWidthImage(block: BlockNode | undefined): boolean {
-  return block?.type === 'image' && block.style.fullWidth;
-}
-
 /**
  * Builds the MJML for an email. The card matches the legacy shell: 570px wide inside a 20px
  * canvas, footer padded 35px. Everything that depends on the recipient is a slot.
@@ -271,8 +266,7 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
 
   const sections: string[] = [];
   const rootIds = document.root.childIds;
-  const firstBlock = rootIds[0] ? document.blocks[rootIds[0]] : undefined;
-  if (!isFullWidthImage(firstBlock)) sections.push(spacerSection(document.root.style.paddingTop, theme.cardColor));
+  sections.push(spacerSection(document.root.style.paddingTop, theme.cardColor));
 
   for (const id of rootIds) {
     const block = document.blocks[id];

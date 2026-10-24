@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLASSIC_BLOCK_ID,
+  adjustTopSpacing,
   copyBlockTexts,
   createBlock,
   createEmptyDocument,
@@ -101,6 +102,26 @@ describe('tree operations', () => {
     const { document: duplicated, idMap, newId } = duplicateBlock(document, textId);
     const copied = copyBlockTexts(texts, OWNER, duplicated, idMap);
     expect(copied[`${OWNER}.block.${newId}.html`]).toEqual({ da: '<p>Hej</p>', en: '<p>Hi</p>' });
+  });
+});
+
+describe('top spacing', () => {
+  it('drops to 0 when an image opens the document and comes back when it no longer does', () => {
+    const empty = createEmptyDocument('email');
+    const image = createBlock('image', 'email');
+    const withImage = adjustTopSpacing(empty, insertBlock(empty, image, { parentId: 'root', region: 0, index: 0 }));
+    expect(withImage.root.style.paddingTop).toBe(0);
+
+    const heading = createBlock('heading', 'email', { taken: withImage.blocks });
+    const headingFirst = adjustTopSpacing(withImage, insertBlock(withImage, heading, { parentId: 'root', region: 0, index: 0 }));
+    expect(headingFirst.root.style.paddingTop).toBe(24);
+  });
+
+  it('keeps a top spacing the user chose', () => {
+    const empty = createEmptyDocument('email');
+    const custom = { ...empty, root: { ...empty.root, style: { ...empty.root.style, paddingTop: 40 } } };
+    const image = createBlock('image', 'email');
+    expect(adjustTopSpacing(custom, insertBlock(custom, image, { parentId: 'root', region: 0, index: 0 })).root.style.paddingTop).toBe(40);
   });
 });
 

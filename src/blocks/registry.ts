@@ -2,13 +2,13 @@ import { z } from 'zod';
 import { normalizeColor } from './colors';
 import {
   COLUMN_LAYOUTS,
+  type BlockDocument,
   type BlockNode,
   type BlockPropsByType,
   type BlockStyle,
   type BlockType,
   type ColumnsLayout,
   type Padding,
-  type RootStyle,
   type Surface,
 } from './types';
 
@@ -61,11 +61,13 @@ const padded = (vertical: number): BlockStyle => ({
 
 /**
  * The padding a block renders with: its own top/bottom, the document's side spacing for top-level
- * blocks, none on the sides for full-width blocks and blocks inside columns.
+ * blocks, none on the sides for full-width blocks and blocks inside columns. An image that opens the
+ * document has no space of its own above it, so the document's top spacing alone decides the gap.
  */
-export function resolveBlockPadding(block: BlockNode, root: RootStyle, nested: boolean): Padding {
-  const side = nested || block.style.fullWidth ? 0 : root.paddingX;
-  return { top: block.style.padding.top, right: side, bottom: block.style.padding.bottom, left: side };
+export function resolveBlockPadding(block: BlockNode, document: Pick<BlockDocument, 'root'>, nested: boolean): Padding {
+  const side = nested || block.style.fullWidth ? 0 : document.root.style.paddingX;
+  const opensWithImage = !nested && block.type === 'image' && document.root.childIds[0] === block.id;
+  return { top: opensWithImage ? 0 : block.style.padding.top, right: side, bottom: block.style.padding.bottom, left: side };
 }
 
 /** A translatable value of a block, stored in `event_text`. */

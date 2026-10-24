@@ -39,6 +39,27 @@ function parseRootStyle(raw: unknown, surface: Surface): RootStyle {
   };
 }
 
+function opensWithImage(document: BlockDocument): boolean {
+  const firstId = document.root.childIds[0];
+  return !!firstId && document.blocks[firstId]?.type === 'image';
+}
+
+/**
+ * Follows a structural edit with a sensible top spacing: none when an image becomes the opening
+ * block (a banner sits flush), the default again when something else takes its place. A value the
+ * user changed from those defaults is left alone.
+ */
+export function adjustTopSpacing(previous: BlockDocument, next: BlockDocument): BlockDocument {
+  const before = opensWithImage(previous);
+  const after = opensWithImage(next);
+  if (before === after) return next;
+  const defaultTop = defaultRootStyle(next.surface).paddingTop;
+  const current = next.root.style.paddingTop;
+  const target = after ? (current === defaultTop ? 0 : current) : current === 0 ? defaultTop : current;
+  if (target === current) return next;
+  return { ...next, root: { ...next.root, style: { ...next.root.style, paddingTop: target } } };
+}
+
 /** Images saved before `style.fullWidth` existed marked edge-to-edge with `props.fullBleed`. */
 function legacyFullBleed(rawBlock: Record<string, unknown>): boolean {
   const style = rawBlock.style;

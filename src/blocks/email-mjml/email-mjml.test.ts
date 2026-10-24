@@ -49,14 +49,18 @@ describe('buildEmailMjml', () => {
     expect(slot?.kind === 'button' && slot.raw).toBe('{{guest.registration_form_url;Tilmeld, nu}}');
   });
 
-  it('lets a full-width image skip the top padding', () => {
+  it('leaves the space above an opening image to the document top spacing', () => {
     let document = createEmptyDocument('email');
     const image = createBlock('image', 'email', { style: { fullWidth: true } });
     document = insertBlock(document, image, { parentId: 'root', region: 0, index: 0 });
-    const output = build(document, { [`${OWNER}.block.${image.id}.src`]: { da: 'https://cdn.example.com/a.png' } });
-    expect(output.mjml).toContain('<mj-image src="https://cdn.example.com/a.png"');
-    expect(output.mjml).toContain('width="570px"');
-    expect(output.mjml.indexOf('mj-spacer height="24px"')).toBe(-1);
+    const texts = { [`${OWNER}.block.${image.id}.src`]: { da: 'https://cdn.example.com/a.png' } };
+
+    const flush = build({ ...document, root: { ...document.root, style: { ...document.root.style, paddingTop: 0 } } }, texts);
+    expect(flush.mjml).toContain('width="570px" align="center" padding="0px 0px 8px 0px"');
+    expect(flush.mjml).not.toContain('mj-spacer height="0px"');
+
+    const spaced = build({ ...document, root: { ...document.root, style: { ...document.root.style, paddingTop: 40 } } }, texts);
+    expect(spaced.mjml).toContain('mj-spacer height="40px"');
   });
 
   it('applies the document side spacing to each top-level block, except full-width ones', () => {
