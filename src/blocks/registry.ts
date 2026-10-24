@@ -2,11 +2,13 @@ import { z } from 'zod';
 import { normalizeColor } from './colors';
 import {
   COLUMN_LAYOUTS,
+  type BlockNode,
   type BlockPropsByType,
   type BlockStyle,
   type BlockType,
   type ColumnsLayout,
   type Padding,
+  type RootStyle,
   type Surface,
 } from './types';
 
@@ -41,18 +43,30 @@ const styleSchema = (fallback: BlockStyle) =>
     .object({
       padding: paddingSchema(fallback.padding),
       backgroundColor: colorSchema.default(null),
+      fullWidth: z.boolean().catch(false).default(false),
     })
     .catch(fallback);
 
 /** Horizontal inset that lines block content up with the legacy email body (570px card, 35px sides). */
 export const EMAIL_CONTENT_INSET = 35;
 
-const edgeInset = (surface: Surface) => (surface === 'email' ? EMAIL_CONTENT_INSET : 0);
+/** Default side spacing of a document (`RootStyle.paddingX`). */
+export const defaultSideInset = (surface: Surface) => (surface === 'email' ? EMAIL_CONTENT_INSET : 0);
 
-const padded = (surface: Surface, vertical: number): BlockStyle => ({
-  padding: { top: vertical, right: edgeInset(surface), bottom: vertical, left: edgeInset(surface) },
+const padded = (vertical: number): BlockStyle => ({
+  padding: { top: vertical, right: 0, bottom: vertical, left: 0 },
   backgroundColor: null,
+  fullWidth: false,
 });
+
+/**
+ * The padding a block renders with: its own top/bottom, the document's side spacing for top-level
+ * blocks, none on the sides for full-width blocks and blocks inside columns.
+ */
+export function resolveBlockPadding(block: BlockNode, root: RootStyle, nested: boolean): Padding {
+  const side = nested || block.style.fullWidth ? 0 : root.paddingX;
+  return { top: block.style.padding.top, right: side, bottom: block.style.padding.bottom, left: side };
+}
 
 /** A translatable value of a block, stored in `event_text`. */
 export type TextField = 'html' | 'label' | 'href' | 'src' | 'alt';
@@ -83,7 +97,7 @@ const buttonProps = (): BlockPropsByType['button'] => ({
   textColor: null,
   radius: 6,
 });
-const imageProps = (): BlockPropsByType['image'] => ({ width: 100, align: 'center', fullBleed: false, radius: 0 });
+const imageProps = (): BlockPropsByType['image'] => ({ width: 100, align: 'center', radius: 0 });
 const dividerProps = (): BlockPropsByType['divider'] => ({ color: null, thickness: 1, lineStyle: 'solid' });
 const spacerProps = (): BlockPropsByType['spacer'] => ({ height: 24 });
 const columnsProps = (): BlockPropsByType['columns'] => ({
@@ -116,7 +130,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       color: colorSchema,
     }),
     defaultProps: headingProps,
-    defaultStyle: (surface) => padded(surface, 8),
+    defaultStyle: () => padded(8),
   },
   text: {
     type: 'text',
@@ -128,7 +142,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     textFields: [{ field: 'html', kind: 'rich', label: 'Text' }],
     propsSchema: withDefaults(textProps, { align: alignSchema, color: colorSchema }),
     defaultProps: textProps,
-    defaultStyle: (surface) => padded(surface, 8),
+    defaultStyle: () => padded(8),
   },
   button: {
     type: 'button',
@@ -149,7 +163,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       radius: intIn(0, 40, 6),
     }),
     defaultProps: buttonProps,
-    defaultStyle: (surface) => padded(surface, 12),
+    defaultStyle: () => padded(12),
   },
   image: {
     type: 'image',
@@ -166,11 +180,10 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     propsSchema: withDefaults(imageProps, {
       width: intIn(10, 100, 100),
       align: z.enum(['left', 'center', 'right']).catch('center'),
-      fullBleed: z.boolean().catch(false),
       radius: intIn(0, 40, 0),
     }),
     defaultProps: imageProps,
-    defaultStyle: (surface) => padded(surface, 8),
+    defaultStyle: () => padded(8),
   },
   divider: {
     type: 'divider',
@@ -186,7 +199,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       lineStyle: z.enum(['solid', 'dashed', 'dotted']).catch('solid'),
     }),
     defaultProps: dividerProps,
-    defaultStyle: (surface) => padded(surface, 16),
+    defaultStyle: () => padded(16),
   },
   spacer: {
     type: 'spacer',
@@ -198,7 +211,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     textFields: [],
     propsSchema: withDefaults(spacerProps, { height: intIn(4, 200, 24) }),
     defaultProps: spacerProps,
-    defaultStyle: () => ({ padding: { top: 0, right: 0, bottom: 0, left: 0 }, backgroundColor: null }),
+    defaultStyle: () => padded(0),
   },
   columns: {
     type: 'columns',
@@ -215,7 +228,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       verticalAlign: z.enum(['top', 'middle', 'bottom']).catch('top'),
     }),
     defaultProps: columnsProps,
-    defaultStyle: (surface) => padded(surface, 8),
+    defaultStyle: () => padded(8),
   },
   classic: {
     type: 'classic',
@@ -228,8 +241,9 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     propsSchema: withDefaults(classicProps, { edgeToEdgeFirstImage: z.boolean().catch(false) }),
     defaultProps: classicProps,
     defaultStyle: (surface) => ({
-      padding: { top: edgeInset(surface), right: edgeInset(surface), bottom: 0, left: edgeInset(surface) },
+      padding: { top: defaultSideInset(surface), right: 0, bottom: 0, left: 0 },
       backgroundColor: null,
+      fullWidth: false,
     }),
   },
 };

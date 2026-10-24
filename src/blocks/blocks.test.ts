@@ -116,7 +116,25 @@ describe('document parsing', () => {
     if (!result.ok) return;
     expect(result.document.blocks.babc?.props).toEqual({ level: 2, align: 'left', color: null });
     expect(result.document.root.style.paddingTop).toBe(200);
+    expect(result.document.root.style.paddingX).toBe(35);
     expect(result.issues).toHaveLength(2);
+  });
+
+  it('turns the old image fullBleed prop into a full-width block', () => {
+    const result = parseBlockDocument({
+      version: 1,
+      surface: 'email',
+      root: { childIds: ['bimg', 'bimg2'] },
+      blocks: {
+        bimg: { type: 'image', props: { fullBleed: true } },
+        bimg2: { type: 'image', props: { fullBleed: true }, style: { fullWidth: false } },
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.blocks.bimg?.style.fullWidth).toBe(true);
+    expect(result.document.blocks.bimg?.props).not.toHaveProperty('fullBleed');
+    expect(result.document.blocks.bimg2?.style.fullWidth).toBe(false);
   });
 
   it('rejects containers inside containers and a second classic block', () => {

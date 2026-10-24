@@ -11,9 +11,15 @@ export type Align = 'left' | 'center' | 'right';
 export type Padding = { top: number; right: number; bottom: number; left: number };
 
 export type BlockStyle = {
+  /**
+   * Only `top` and `bottom` are used. Side spacing comes from the document (`RootStyle.paddingX`)
+   * for top-level blocks and is 0 inside columns; see `resolveBlockPadding`.
+   */
   padding: Padding;
   /** Null keeps the surrounding (card) color. */
   backgroundColor: string | null;
+  /** Top-level blocks only: ignore the document's side spacing and reach the edges of the card. */
+  fullWidth: boolean;
 };
 
 export type HeadingLevel = 1 | 2 | 3;
@@ -43,8 +49,6 @@ export type ImageProps = {
   /** Percent of the available width, 10-100. */
   width: number;
   align: Align;
-  /** Ignore horizontal padding and span the whole card (email) or container. */
-  fullBleed: boolean;
   radius: number;
 };
 
@@ -120,6 +124,8 @@ export type RootStyle = {
   paddingTop: number;
   /** Space below the last block, before the footer. */
   paddingBottom: number;
+  /** Side spacing, applied to every top-level block that is not full width. */
+  paddingX: number;
 };
 
 export const BLOCK_DOCUMENT_VERSION = 1;

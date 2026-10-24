@@ -1,4 +1,4 @@
-import { BLOCK_DEFINITIONS } from './registry';
+import { BLOCK_DEFINITIONS, defaultSideInset } from './registry';
 import { createBlock } from './tree';
 import { BLOCK_DOCUMENT_VERSION, type BlockDocument, type Surface } from './types';
 
@@ -16,7 +16,7 @@ export function createLegacyDocument(surface: Surface, options?: { edgeToEdgeFir
   return {
     version: BLOCK_DOCUMENT_VERSION,
     surface,
-    root: { childIds: [classic.id], style: { paddingTop: 0, paddingBottom: 0 } },
+    root: { childIds: [classic.id], style: { paddingTop: 0, paddingBottom: 0, paddingX: defaultSideInset(surface) } },
     blocks: { [classic.id]: classic },
   };
 }
@@ -32,11 +32,11 @@ export function isLegacyOnlyDocument(document: BlockDocument): boolean {
   return (
     document.root.style.paddingTop === 0 &&
     document.root.style.paddingBottom === 0 &&
+    document.root.style.paddingX === defaultSideInset(document.surface) &&
     only.style.backgroundColor === null &&
+    !only.style.fullWidth &&
     padding.top === defaults.padding.top &&
-    padding.right === defaults.padding.right &&
-    padding.bottom === defaults.padding.bottom &&
-    padding.left === defaults.padding.left
+    padding.bottom === defaults.padding.bottom
   );
 }
 

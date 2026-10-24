@@ -49,14 +49,37 @@ describe('buildEmailMjml', () => {
     expect(slot?.kind === 'button' && slot.raw).toBe('{{guest.registration_form_url;Tilmeld, nu}}');
   });
 
-  it('lets a full-bleed image skip the top padding', () => {
+  it('lets a full-width image skip the top padding', () => {
     let document = createEmptyDocument('email');
-    const image = createBlock('image', 'email', { props: { fullBleed: true } });
+    const image = createBlock('image', 'email', { style: { fullWidth: true } });
     document = insertBlock(document, image, { parentId: 'root', region: 0, index: 0 });
     const output = build(document, { [`${OWNER}.block.${image.id}.src`]: { da: 'https://cdn.example.com/a.png' } });
     expect(output.mjml).toContain('<mj-image src="https://cdn.example.com/a.png"');
     expect(output.mjml).toContain('width="570px"');
     expect(output.mjml.indexOf('mj-spacer height="24px"')).toBe(-1);
+  });
+
+  it('applies the document side spacing to each top-level block, except full-width ones', () => {
+    let document = createEmptyDocument('email');
+    document = { ...document, root: { ...document.root, style: { ...document.root.style, paddingX: 20 } } };
+    const text = createBlock('text', 'email', { taken: document.blocks });
+    document = insertBlock(document, text, { parentId: 'root', region: 0, index: 0 });
+    const divider = createBlock('divider', 'email', { taken: document.blocks, style: { fullWidth: true } });
+    document = insertBlock(document, divider, { parentId: 'root', region: 0, index: 1 });
+    const output = build(document, { [`${OWNER}.block.${text.id}.html`]: { da: '<p>Hej</p>' } });
+    expect(output.mjml).toContain('<mj-text padding="8px 20px 8px 20px"');
+    expect(output.mjml).toContain('<mj-divider border-color="#e5e7eb" border-width="1px" border-style="solid" padding="16px 0px 16px 0px"');
+  });
+
+  it('gives blocks inside columns no side spacing of their own', () => {
+    let document = createEmptyDocument('email');
+    const columns = createBlock('columns', 'email', { taken: document.blocks });
+    document = insertBlock(document, columns, { parentId: 'root', region: 0, index: 0 });
+    const text = createBlock('text', 'email', { taken: document.blocks });
+    document = insertBlock(document, text, { parentId: columns.id, region: 0, index: 0 });
+    const output = build(document, { [`${OWNER}.block.${text.id}.html`]: { da: '<p>Hej</p>' } });
+    expect(output.mjml).toContain('padding="8px 35px 8px 35px" css-class="email-card"');
+    expect(output.mjml).toContain('<mj-text padding="8px 0px 8px 0px"');
   });
 });
 

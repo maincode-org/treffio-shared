@@ -1,6 +1,6 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeUrl, toTagSafeText } from '../html';
-import { columnWidths, type TextField } from '../registry';
+import { columnWidths, resolveBlockPadding, type TextField } from '../registry';
 import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, Padding } from '../types';
 
 /** Resolved shell colors and fonts. Colors are hex or rgba(); `fontFamily` must not contain double quotes. */
@@ -142,7 +142,7 @@ function containerBg(block: BlockNode, nested: boolean): string {
 /** One block as MJML content elements (inside an mj-column). `width` is the available px width. */
 function renderElement(block: BlockNode, ctx: RenderContext, width: number, nested: boolean): string {
   const { input, theme } = ctx;
-  const padding = block.style.padding;
+  const padding = resolveBlockPadding(block, input.document.root.style, nested);
   const bg = containerBg(block, nested);
 
   switch (block.type) {
@@ -201,12 +201,11 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
       if (!src) return '';
       const alt = input.readText(block, 'alt');
       const href = sanitizeUrl(input.readText(block, 'href'));
-      const effectivePadding: Padding = block.props.fullBleed ? { ...padding, left: 0, right: 0 } : padding;
-      const available = Math.max(1, width - effectivePadding.left - effectivePadding.right);
+      const available = Math.max(1, width - padding.left - padding.right);
       const imageWidth = Math.max(1, Math.round((available * block.props.width) / 100));
       const hrefAttr = href && !parseTagOnlyValue(href) ? ` href="${attr(href)}" target="_blank"` : '';
       const radius = block.props.radius > 0 ? ` border-radius="${block.props.radius}px"` : '';
-      return `<mj-image src="${attr(src)}" alt="${attr(alt)}" width="${imageWidth}px" align="${block.props.align}" padding="${paddingAttr(effectivePadding)}"${radius}${hrefAttr}${bg} />`;
+      return `<mj-image src="${attr(src)}" alt="${attr(alt)}" width="${imageWidth}px" align="${block.props.align}" padding="${paddingAttr(padding)}"${radius}${hrefAttr}${bg} />`;
     }
     case 'divider': {
       const color = block.props.color ?? theme.dividerColor;
@@ -232,7 +231,7 @@ function spacerSection(height: number, background: string): string {
 function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
   const { document } = ctx.input;
   const widths = columnWidths(block.props.layout);
-  const padding = block.style.padding;
+  const padding = resolveBlockPadding(block, document.root.style, false);
   const inner = Math.max(1, ctx.cardWidth - padding.left - padding.right);
   const half = block.props.gap / 2;
   const lastIndex = widths.length - 1;
@@ -254,8 +253,9 @@ function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
   return section(body, block.style.backgroundColor ?? ctx.theme.cardColor, padding);
 }
 
-function isFullBleedImage(block: BlockNode | undefined): boolean {
-  return block?.type === 'image' && block.props.fullBleed;
+/** A full-width image at the very top acts as a banner, so the space above the first block is skipped. */
+function isFullWidthImage(block: BlockNode | undefined): boolean {
+  return block?.type === 'image' && block.style.fullWidth;
 }
 
 /**
@@ -272,7 +272,7 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   const sections: string[] = [];
   const rootIds = document.root.childIds;
   const firstBlock = rootIds[0] ? document.blocks[rootIds[0]] : undefined;
-  if (!isFullBleedImage(firstBlock)) sections.push(spacerSection(document.root.style.paddingTop, theme.cardColor));
+  if (!isFullWidthImage(firstBlock)) sections.push(spacerSection(document.root.style.paddingTop, theme.cardColor));
 
   for (const id of rootIds) {
     const block = document.blocks[id];

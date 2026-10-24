@@ -1,5 +1,5 @@
 import { BLOCK_ID_PATTERN } from './ids';
-import { BLOCK_DEFINITIONS, PADDING_MAX, columnCount, isBlockType, parseBlockProps, parseBlockStyle } from './registry';
+import { BLOCK_DEFINITIONS, PADDING_MAX, columnCount, defaultSideInset, isBlockType, parseBlockProps, parseBlockStyle } from './registry';
 import {
   BLOCK_DOCUMENT_VERSION,
   SURFACES,
@@ -25,17 +25,25 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.round(Math.min(max, Math.max(min, n)));
 }
 
-export function defaultRootStyle(): RootStyle {
-  return { paddingTop: 24, paddingBottom: 8 };
+export function defaultRootStyle(surface: Surface): RootStyle {
+  return { paddingTop: 24, paddingBottom: 8, paddingX: defaultSideInset(surface) };
 }
 
-function parseRootStyle(raw: unknown): RootStyle {
-  const fallback = defaultRootStyle();
+function parseRootStyle(raw: unknown, surface: Surface): RootStyle {
+  const fallback = defaultRootStyle(surface);
   if (!isRecord(raw)) return fallback;
   return {
     paddingTop: clampInt(raw.paddingTop, 0, PADDING_MAX, fallback.paddingTop),
     paddingBottom: clampInt(raw.paddingBottom, 0, PADDING_MAX, fallback.paddingBottom),
+    paddingX: clampInt(raw.paddingX, 0, PADDING_MAX, fallback.paddingX),
   };
+}
+
+/** Images saved before `style.fullWidth` existed marked edge-to-edge with `props.fullBleed`. */
+function legacyFullBleed(rawBlock: Record<string, unknown>): boolean {
+  const style = rawBlock.style;
+  if (isRecord(style) && typeof style.fullWidth === 'boolean') return false;
+  return rawBlock.type === 'image' && isRecord(rawBlock.props) && rawBlock.props.fullBleed === true;
 }
 
 function stringArray(raw: unknown): string[] {
@@ -109,6 +117,7 @@ export function parseBlockDocument(raw: unknown, expectedSurface?: Surface): Par
       props: parseBlockProps(type, rawBlock.props),
       style: parseBlockStyle(type, typedSurface, rawBlock.style),
     } as BlockNode;
+    if (legacyFullBleed(rawBlock)) node.style = { ...node.style, fullWidth: true };
 
     if (definition.container && node.type === 'columns') {
       const count = columnCount(node.props.layout);
@@ -142,7 +151,7 @@ export function parseBlockDocument(raw: unknown, expectedSurface?: Surface): Par
     document: {
       version: BLOCK_DOCUMENT_VERSION,
       surface: typedSurface,
-      root: { childIds, style: parseRootStyle(raw.root.style) },
+      root: { childIds, style: parseRootStyle(raw.root.style, typedSurface) },
       blocks,
     },
     issues,
@@ -150,7 +159,7 @@ export function parseBlockDocument(raw: unknown, expectedSurface?: Surface): Par
 }
 
 export function createEmptyDocument(surface: Surface): BlockDocument {
-  return { version: BLOCK_DOCUMENT_VERSION, surface, root: { childIds: [], style: defaultRootStyle() }, blocks: {} };
+  return { version: BLOCK_DOCUMENT_VERSION, surface, root: { childIds: [], style: defaultRootStyle(surface) }, blocks: {} };
 }
 
 export function blockTypesInDocument(document: BlockDocument): Set<BlockType> {
