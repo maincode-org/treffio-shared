@@ -19,6 +19,7 @@ import {
   removeBlock,
   setColumnsLayout,
   textKeyForBlock,
+  withDocumentBodies,
   writeLocalized,
   type BlockDocument,
 } from './index';
@@ -166,6 +167,20 @@ describe('texts', () => {
     const id = document.root.childIds[0] ?? '';
     expect(documentTextKeys(document, OWNER)).toEqual([`${OWNER}.block.${id}.label`, `${OWNER}.block.${id}.href`]);
     expect(orphanedBlockTextKeys(document, OWNER, [`${OWNER}.block.bgone.html`, `${OWNER}.subject`])).toEqual([`${OWNER}.block.bgone.html`]);
+  });
+
+  it('summarizes block bodies into legacy content rows for readiness checks', () => {
+    const document = documentWith('text');
+    const textId = document.root.childIds[0] ?? '';
+    const rows = [
+      { key: `${OWNER}.subject`, da: 'Emne', en: null },
+      { key: `${OWNER}.block.${textId}.html`, da: '<p>Hej med dig</p>', en: '' },
+    ];
+    const augmented = withDocumentBodies(rows, new Map([[OWNER, document]]));
+    const content = augmented.find((row) => row.key === `${OWNER}.content`);
+    expect(content?.da).toBe('Hej med dig');
+    expect(content?.en).toBeNull();
+    expect(augmented).toHaveLength(3);
   });
 
   it('treats a document with only empty blocks as empty', () => {
