@@ -307,7 +307,11 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     '</mj-head>',
   ].join('');
 
-  const body = `<mj-body background-color="${attr(theme.canvasColor)}" width="${cardWidth + canvasPadding * 2}px"><mj-wrapper padding="${canvasPadding}px" css-class="email-canvas">${sections.join('')}</mj-wrapper></mj-body>`;
+  // Each block is its own table. Dark-mode clients (Outlook) recolor them one by one and leave
+  // hairline gaps between them, so the wrapper behind them carries the card color and the canvas
+  // around the card is a border instead of padding over the canvas color.
+  const canvasBorder = canvasPadding > 0 ? ` border="${canvasPadding}px solid ${attr(theme.canvasColor)}"` : '';
+  const body = `<mj-body background-color="${attr(theme.canvasColor)}" width="${cardWidth + canvasPadding * 2}px"><mj-wrapper padding="0" background-color="${attr(theme.cardColor)}"${canvasBorder} css-class="email-canvas">${sections.join('')}</mj-wrapper></mj-body>`;
 
   return { mjml: `<mjml>${head}${body}</mjml>`, slots: ctx.slots };
 }

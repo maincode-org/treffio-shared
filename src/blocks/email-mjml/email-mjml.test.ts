@@ -34,6 +34,11 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('width="610px"');
   });
 
+  it('puts the card color behind every block so dark mode shows no seams between them', () => {
+    const output = build(createLegacyDocument('email'), {});
+    expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff" border="20px solid #f5f8fa" css-class="email-canvas">');
+  });
+
   it('skips empty blocks and builds a link-tag button', () => {
     let document = createEmptyDocument('email');
     const text = createBlock('text', 'email', { taken: document.blocks });
