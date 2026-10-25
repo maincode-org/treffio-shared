@@ -34,6 +34,18 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('<mj-body background-color="#f5f8fa" width="570px" css-class="email-canvas">');
   });
 
+  it('sets heading blocks in the heading font', () => {
+    let document = createEmptyDocument('email');
+    const heading = createBlock('heading', 'email');
+    document = insertBlock(document, heading, { parentId: 'root', region: 0, index: 0 });
+    const texts = { [`${OWNER}.block.${heading.id}.html`]: { da: 'Velkommen' } };
+    const readText = (block: Parameters<typeof readBlockText>[2], field: Parameters<typeof readBlockText>[3]) => readBlockText(texts, OWNER, block, field, 'da');
+
+    const output = buildEmailMjml({ document, readText, theme: { ...theme, headingFontFamily: "Georgia, 'Times New Roman', serif" } });
+    expect(output.mjml).toContain("font-family: Georgia, 'Times New Roman', serif !important");
+    expect(build(document, texts).mjml).toContain(`font-family: ${theme.fontFamily} !important`);
+  });
+
   it('puts the card color behind every block and keeps the canvas free of borders, for dark mode', () => {
     const output = build(createLegacyDocument('email'), {});
     expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff" css-class="email-card-stack">');

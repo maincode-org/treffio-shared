@@ -9,6 +9,8 @@ export type EmailShellTheme = {
   cardColor: string;
   textColor: string;
   fontFamily: string;
+  /** Heading blocks. Defaults to `fontFamily`. Must not contain double quotes either. */
+  headingFontFamily?: string;
   buttonBackground: string;
   buttonText: string;
   dividerColor: string;
@@ -161,7 +163,7 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
       const color = block.props.color ?? theme.textColor;
       const style = [
         'margin: 0 !important',
-        `font-family: ${theme.fontFamily} !important`,
+        `font-family: ${theme.headingFontFamily ?? theme.fontFamily} !important`,
         `font-size: ${HEADING_SIZES[level]}px !important`,
         'font-weight: 700 !important',
         'line-height: 1.2 !important',
