@@ -83,6 +83,13 @@ export type ColumnsProps = {
 export type CoverProps = {
   /** Text color for headings and text inside that have none of their own. Null uses the theme. */
   textColor: string | null;
+  /** Height in px. Null fits the image: the block keeps the image's proportions (and grows for content). */
+  height: number | null;
+  /** Where the blocks sit when the image is taller than they are. */
+  verticalAlign: VerticalAlign;
+  /** The image's pixel size, measured when it is chosen. Needed to fit the block to the image. */
+  imageWidth: number | null;
+  imageHeight: number | null;
 };
 
 /** Content written in the old single rich text editor. Its HTML lives on the owner's `.content` key. */

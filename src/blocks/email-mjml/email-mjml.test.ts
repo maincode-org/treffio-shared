@@ -73,7 +73,25 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('<mj-section background-color="#ff0000" border-radius="0px 0px 16px 16px"');
   });
 
-  it('puts blocks on top of an image with text, in its text color', () => {
+  it('sizes an image with content to its image, or to a set height', () => {
+    const make = (props: { height?: number | null; imageWidth?: number | null; imageHeight?: number | null }) => {
+      let document = createEmptyDocument('email');
+      const cover = createBlock('cover', 'email', { props, style: { backgroundImage: 'https://cdn.example.com/hero.jpg' } });
+      document = insertBlock(document, cover, { parentId: 'root', region: 0, index: 0 });
+      return build(document, {}).mjml;
+    };
+    const fitted = make({ imageWidth: 1200, imageHeight: 600 });
+    expect(fitted).toContain('<mj-hero mode="fluid-height" background-url="https://cdn.example.com/hero.jpg" background-width="570px" background-height="285px"');
+    expect(fitted).toContain('vertical-align="middle" padding="40px 35px 40px 35px"');
+
+    const fixed = make({ height: 400, imageWidth: 1200, imageHeight: 600 });
+    expect(fixed).toContain('<mj-hero mode="fixed-height" height="400px" background-url="https://cdn.example.com/hero.jpg" background-width="800px" background-height="400px"');
+
+    // Without a known image size or a height, the content alone decides the height.
+    expect(make({})).toContain('<mj-section background-url="https://cdn.example.com/hero.jpg"');
+  });
+
+  it('puts blocks on top of an image with content, in its text color', () => {
     let document = createEmptyDocument('email');
     const cover = createBlock('cover', 'email', { props: { textColor: '#ffffff' }, style: { backgroundImage: 'https://cdn.example.com/hero.jpg' } });
     document = insertBlock(document, cover, { parentId: 'root', region: 0, index: 0 });

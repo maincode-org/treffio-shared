@@ -329,7 +329,49 @@ function renderCover(block: CoverBlock, ctx: RenderContext): string {
     .map((child) => renderElement(child, childCtx, inner, true))
     .join('');
   const fill = blockFill(block, ctx);
-  return section(`<mj-column padding="0">${children}</mj-column>`, fill, padding, blockSectionRadius(block, fill, ctx));
+
+  const hero = fill.image ? coverHeroSize(block, ctx.cardWidth) : null;
+  if (!fill.image || !hero) {
+    return section(`<mj-column padding="0">${children}</mj-column>`, fill, padding, blockSectionRadius(block, fill, ctx));
+  }
+
+  // mj-hero sizes the block: to the image's proportions (fluid) or a set height, and grows when the
+  // blocks need more room. Its background color defaults to white, so it always gets one.
+  const attrs = [
+    `mode="${hero.mode}"`,
+    hero.mode === 'fixed-height' ? `height="${px(hero.height)}"` : '',
+    `background-url="${attr(fill.image)}"`,
+    `background-width="${px(hero.backgroundWidth)}"`,
+    `background-height="${px(hero.backgroundHeight)}"`,
+    'background-position="center center"',
+    `background-color="${attr(fill.color ?? ctx.theme.cardColor)}"`,
+    `vertical-align="${block.props.verticalAlign}"`,
+    `padding="${paddingAttr(padding)}"`,
+  ].filter(Boolean);
+  return `<mj-hero ${attrs.join(' ')}>${children}</mj-hero>`;
+}
+
+/**
+ * How an image with content is sized: a set height, or the image's proportions when its pixel size
+ * is known. The background size is the image scaled to cover the block, which Outlook draws as is.
+ */
+function coverHeroSize(
+  block: CoverBlock,
+  cardWidth: number
+): { mode: 'fluid-height' | 'fixed-height'; height: number; backgroundWidth: number; backgroundHeight: number } | null {
+  const { height, imageWidth, imageHeight } = block.props;
+  const hasSize = !!imageWidth && !!imageHeight;
+  if (height === null && !hasSize) return null;
+  if (!hasSize) return { mode: 'fixed-height', height: height ?? 0, backgroundWidth: cardWidth, backgroundHeight: height ?? 0 };
+  const fitted = Math.round((cardWidth * imageHeight) / imageWidth);
+  const target = height ?? fitted;
+  const scale = Math.max(cardWidth / imageWidth, target / imageHeight);
+  return {
+    mode: height === null ? 'fluid-height' : 'fixed-height',
+    height: target,
+    backgroundWidth: Math.round(imageWidth * scale),
+    backgroundHeight: Math.round(imageHeight * scale),
+  };
 }
 
 /**

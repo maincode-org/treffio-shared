@@ -147,7 +147,17 @@ const columnsProps = (): BlockPropsByType['columns'] => ({
   stackOnMobile: true,
   verticalAlign: 'top',
 });
-const coverProps = (): BlockPropsByType['cover'] => ({ textColor: null });
+const coverProps = (): BlockPropsByType['cover'] => ({ textColor: null, height: null, verticalAlign: 'middle', imageWidth: null, imageHeight: null });
+
+export const COVER_HEIGHT_MIN = 60;
+export const COVER_HEIGHT_MAX = 900;
+
+const nullableIntIn = (min: number, max: number) =>
+  z
+    .number()
+    .nullable()
+    .catch(null)
+    .transform((value) => (value === null || !Number.isFinite(value) ? null : Math.round(Math.min(max, Math.max(min, value)))));
 const classicProps = (): BlockPropsByType['classic'] => ({ edgeToEdgeFirstImage: false });
 
 const withDefaults = <T extends object>(defaults: () => T, shape: z.ZodRawShape) =>
@@ -274,13 +284,19 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
   },
   cover: {
     type: 'cover',
-    label: 'Image with text',
-    description: 'Headings, text and buttons on top of an image',
+    label: 'Image with content',
+    description: 'Any blocks on top of an image',
     surfaces: ['email', 'in_app', 'page'],
     insertable: true,
     container: true,
     textFields: [],
-    propsSchema: withDefaults(coverProps, { textColor: colorSchema }),
+    propsSchema: withDefaults(coverProps, {
+      textColor: colorSchema,
+      height: nullableIntIn(COVER_HEIGHT_MIN, COVER_HEIGHT_MAX),
+      verticalAlign: z.enum(['top', 'middle', 'bottom']).catch('middle'),
+      imageWidth: nullableIntIn(1, 20000),
+      imageHeight: nullableIntIn(1, 20000),
+    }),
     defaultProps: coverProps,
     defaultStyle: () => padded(40),
   },
