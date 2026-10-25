@@ -35,6 +35,7 @@ export function isLegacyOnlyDocument(document: BlockDocument): boolean {
     document.root.style.paddingX === defaultSideInset(document.surface) &&
     document.root.style.showFooter &&
     only.style.backgroundColor === null &&
+    only.style.backgroundImage === null &&
     !only.style.fullWidth &&
     padding.top === defaults.padding.top &&
     padding.bottom === defaults.padding.bottom

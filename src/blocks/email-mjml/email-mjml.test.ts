@@ -34,6 +34,30 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('<mj-body background-color="#f5f8fa" width="570px" css-class="email-canvas">');
   });
 
+  it('paints background images on blocks, the card and the canvas', () => {
+    let document = createEmptyDocument('email');
+    const text = createBlock('text', 'email', { style: { backgroundImage: 'https://cdn.example.com/block.jpg' } });
+    document = insertBlock(document, text, { parentId: 'root', region: 0, index: 0 });
+    const output = buildEmailMjml({
+      document,
+      readText: (block, field) => readBlockText({ [`${OWNER}.block.${text.id}.html`]: { da: '<p>Hej</p>' } }, OWNER, block, field, 'da'),
+      theme: { ...theme, cardImage: 'https://cdn.example.com/card.jpg', canvasImage: 'https://cdn.example.com/canvas.jpg' },
+      transformUrl: (url) => url.replace('cdn.example.com', 'img.example.com'),
+    });
+    expect(output.mjml).toContain('background-url="https://img.example.com/block.jpg" background-size="cover"');
+    expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff" background-url="https://img.example.com/card.jpg"');
+    expect(output.mjml).toContain('.email-canvas { background-image: url("https://img.example.com/canvas.jpg")');
+    // With a card image, sections without a color of their own stay transparent so it shows.
+    expect(output.mjml).not.toContain('<mj-section background-color="#ffffff"');
+  });
+
+  it('drops background image URLs that could break out of CSS', () => {
+    const output = build(createEmptyDocument('email'), {});
+    const unsafe = buildEmailMjml({ document: createEmptyDocument('email'), readText: () => '', theme: { ...theme, canvasImage: 'https://x.com/a.jpg"); color: red; ("' } });
+    expect(unsafe.mjml).not.toContain('background-image');
+    expect(output.mjml).toContain('<mj-section background-color="#ffffff"');
+  });
+
   it('leaves the footer out when the email hides it', () => {
     const legacy = createLegacyDocument('email');
     const hidden = { ...legacy, root: { ...legacy.root, style: { ...legacy.root.style, showFooter: false } } };

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizeColor } from './colors';
+import { sanitizeBackgroundImageUrl } from './html';
 import {
   COLUMN_LAYOUTS,
   type BlockDocument,
@@ -43,6 +44,12 @@ const styleSchema = (fallback: BlockStyle) =>
     .object({
       padding: paddingSchema(fallback.padding),
       backgroundColor: colorSchema.default(null),
+      backgroundImage: z
+        .string()
+        .nullable()
+        .catch(null)
+        .transform((value) => sanitizeBackgroundImageUrl(value))
+        .default(null),
       fullWidth: z.boolean().catch(false).default(false),
     })
     .catch(fallback);
@@ -56,6 +63,7 @@ export const defaultSideInset = (surface: Surface) => (surface === 'email' ? EMA
 const padded = (vertical: number): BlockStyle => ({
   padding: { top: vertical, right: 0, bottom: vertical, left: 0 },
   backgroundColor: null,
+  backgroundImage: null,
   fullWidth: false,
 });
 
@@ -245,6 +253,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     defaultStyle: (surface) => ({
       padding: { top: defaultSideInset(surface), right: 0, bottom: 0, left: 0 },
       backgroundColor: null,
+      backgroundImage: null,
       fullWidth: false,
     }),
   },

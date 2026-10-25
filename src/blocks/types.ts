@@ -18,6 +18,8 @@ export type BlockStyle = {
   padding: Padding;
   /** Null keeps the surrounding (card) color. */
   backgroundColor: string | null;
+  /** Top-level blocks only: an image covering the block, over its background color. Same in every language. */
+  backgroundImage: string | null;
   /** Top-level blocks only: ignore the document's side spacing and reach the edges of the card. */
   fullWidth: boolean;
 };

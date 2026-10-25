@@ -18,6 +18,15 @@ export function escapeAttribute(value: string): string {
 const SAFE_URL_PATTERN = /^(?:https?:\/\/|mailto:|tel:|#|\/)/i;
 const TAG_ONLY_PATTERN = /^\{\{([^{}]+)\}\}$/;
 
+/** No quotes, parentheses, brackets, backslashes or spaces: the URL goes into attributes and CSS `url()`. */
+const BACKGROUND_IMAGE_PATTERN = /^https?:\/\/[^\s"'()<>\\]{1,2000}$/i;
+
+/** A background image URL, or null when it is not a plain http(s) URL that is safe to put into CSS. */
+export function sanitizeBackgroundImageUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  return BACKGROUND_IMAGE_PATTERN.test(trimmed) ? trimmed : null;
+}
+
 /** A link a recipient may click. Tags are allowed; javascript: and data: are not. */
 export function sanitizeUrl(value: string): string {
   const trimmed = value.trim();

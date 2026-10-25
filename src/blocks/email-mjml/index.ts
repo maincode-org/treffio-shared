@@ -1,5 +1,5 @@
 import { opaqueColor } from '../colors';
-import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeUrl, toTagSafeText } from '../html';
+import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
 import { columnWidths, resolveBlockPadding, type TextField } from '../registry';
 import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, Padding } from '../types';
 
@@ -11,6 +11,10 @@ export type EmailShellTheme = {
   fontFamily: string;
   /** Heading blocks. Defaults to `fontFamily`. Must not contain double quotes either. */
   headingFontFamily?: string;
+  /** Image covering the canvas around the card (CSS only; Outlook on Windows shows `canvasColor`). */
+  canvasImage?: string | null;
+  /** Image covering the card behind the blocks. Blocks without a color of their own let it show. */
+  cardImage?: string | null;
   buttonBackground: string;
   buttonText: string;
   dividerColor: string;
@@ -220,14 +224,40 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
   }
 }
 
-function section(inner: string, background: string, padding: Partial<Padding> = {}): string {
-  const p: Padding = { top: 0, right: 0, bottom: 0, left: 0, ...padding };
-  return `<mj-section background-color="${attr(background)}" padding="${paddingAttr(p)}" css-class="email-card">${inner}</mj-section>`;
+/** What paints behind a section. A null color leaves it transparent, so the card (color or image) shows. */
+type SectionFill = { color: string | null; image?: string | null };
+
+function backgroundImageAttrs(url: string): string {
+  return ` background-url="${attr(url)}" background-size="cover" background-position="center center" background-repeat="no-repeat"`;
 }
 
-function spacerSection(height: number, background: string): string {
+function section(inner: string, fill: SectionFill, padding: Partial<Padding> = {}): string {
+  const p: Padding = { top: 0, right: 0, bottom: 0, left: 0, ...padding };
+  const color = fill.color ? ` background-color="${attr(fill.color)}"` : '';
+  const image = fill.image ? backgroundImageAttrs(fill.image) : '';
+  return `<mj-section${color}${image} padding="${paddingAttr(p)}" css-class="email-card">${inner}</mj-section>`;
+}
+
+function spacerSection(height: number, fill: SectionFill): string {
   if (height <= 0) return '';
-  return section(`<mj-column padding="0"><mj-spacer height="${height}px" padding="0" /></mj-column>`, background);
+  return section(`<mj-column padding="0"><mj-spacer height="${height}px" padding="0" /></mj-column>`, fill);
+}
+
+/** A card image must show through the sections, so they only paint the card color without one. */
+function cardFill(ctx: RenderContext): SectionFill {
+  return { color: ctx.theme.cardImage ? null : ctx.theme.cardColor };
+}
+
+function blockFill(block: BlockNode, ctx: RenderContext): SectionFill {
+  const image = sanitizeBackgroundImageUrl(block.style.backgroundImage);
+  return {
+    color: block.style.backgroundColor ?? cardFill(ctx).color,
+    image: image ? imageUrl(image, ctx.input) : null,
+  };
+}
+
+function imageUrl(url: string, input: EmailMjmlInput): string {
+  return input.transformUrl ? input.transformUrl(url) : url;
 }
 
 function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
@@ -252,7 +282,7 @@ function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
     .join('');
 
   const body = block.props.stackOnMobile ? columns : `<mj-group>${columns}</mj-group>`;
-  return section(body, block.style.backgroundColor ?? ctx.theme.cardColor, padding);
+  return section(body, blockFill(block, ctx), padding);
 }
 
 /**
@@ -268,7 +298,7 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
 
   const sections: string[] = [];
   const rootIds = document.root.childIds;
-  sections.push(spacerSection(document.root.style.paddingTop, theme.cardColor));
+  sections.push(spacerSection(document.root.style.paddingTop, cardFill(ctx)));
 
   for (const id of rootIds) {
     const block = document.blocks[id];
@@ -279,10 +309,10 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     }
     const element = renderElement(block, ctx, cardWidth, false);
     if (!element) continue;
-    sections.push(section(`<mj-column padding="0">${element}</mj-column>`, block.style.backgroundColor ?? theme.cardColor));
+    sections.push(section(`<mj-column padding="0">${element}</mj-column>`, blockFill(block, ctx)));
   }
 
-  sections.push(spacerSection(document.root.style.paddingBottom, theme.cardColor));
+  sections.push(spacerSection(document.root.style.paddingBottom, cardFill(ctx)));
 
   if (document.root.style.showFooter) {
     ctx.slots.push({ id: FOOTER_SLOT_ID, kind: 'footer' });
@@ -290,12 +320,18 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     sections.push(
       section(
         `<mj-column padding="0"><mj-text padding="0 ${footerInset}px ${footerInset}px ${footerInset}px">${emailSlotToken(FOOTER_SLOT_ID)}</mj-text></mj-column>`,
-        theme.cardColor
+        cardFill(ctx)
       )
     );
   }
 
-  const css = input.headCss ?? '';
+  // mj-body cannot hold a background image, so the canvas gets one through CSS. Clients without
+  // <style> support (Outlook on Windows) keep the canvas color.
+  const canvasImage = sanitizeBackgroundImageUrl(theme.canvasImage);
+  const canvasImageCss = canvasImage
+    ? `.email-canvas { background-image: url("${imageUrl(canvasImage, input)}"); background-size: cover; background-position: center top; background-repeat: no-repeat; }`
+    : '';
+  const css = [input.headCss ?? '', canvasImageCss].filter(Boolean).join('\n');
   const head = [
     '<mj-head>',
     `<mj-preview>${emailSlotToken(PREHEADER_SLOT_ID)}</mj-preview>`,
@@ -316,7 +352,9 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   // the body itself (borders would keep their light color in dark mode), with spacers above and
   // below the card; on screens wider than the card its sides show the body color.
   const canvasSpacer = canvasPadding > 0 ? `<mj-section padding="0"><mj-column padding="0"><mj-spacer height="${canvasPadding}px" padding="0" /></mj-column></mj-section>` : '';
-  const card = `<mj-wrapper padding="0" background-color="${attr(theme.cardColor)}" css-class="email-card-stack">${sections.join('')}</mj-wrapper>`;
+  const cardImage = sanitizeBackgroundImageUrl(theme.cardImage);
+  const cardImageAttrs = cardImage ? backgroundImageAttrs(imageUrl(cardImage, input)) : '';
+  const card = `<mj-wrapper padding="0" background-color="${attr(theme.cardColor)}"${cardImageAttrs} css-class="email-card-stack">${sections.join('')}</mj-wrapper>`;
   const body = `<mj-body background-color="${attr(theme.canvasColor)}" width="${cardWidth}px" css-class="email-canvas">${canvasSpacer}${card}${canvasSpacer}</mj-body>`;
 
   return { mjml: `<mjml>${head}${body}</mjml>`, slots: ctx.slots };
