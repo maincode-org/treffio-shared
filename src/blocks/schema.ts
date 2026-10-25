@@ -1,5 +1,5 @@
 import { BLOCK_ID_PATTERN } from './ids';
-import { BLOCK_DEFINITIONS, PADDING_MAX, columnCount, defaultSideInset, isBlockType, parseBlockProps, parseBlockStyle } from './registry';
+import { BLOCK_DEFINITIONS, PADDING_MAX, defaultSideInset, isBlockType, parseBlockProps, parseBlockStyle, regionCount } from './registry';
 import {
   BLOCK_DOCUMENT_VERSION,
   SURFACES,
@@ -141,8 +141,8 @@ export function parseBlockDocument(raw: unknown, expectedSurface?: Surface): Par
     } as BlockNode;
     if (legacyFullBleed(rawBlock)) node.style = { ...node.style, fullWidth: true };
 
-    if (definition.container && node.type === 'columns') {
-      const count = columnCount(node.props.layout);
+    if (definition.container) {
+      const count = regionCount(node);
       const rawRegions = Array.isArray(rawBlock.children) ? rawBlock.children : [];
       const regions: string[][] = Array.from({ length: count }, () => []);
       rawRegions.forEach((region, index) => {

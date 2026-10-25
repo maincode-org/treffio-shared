@@ -73,6 +73,20 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('<mj-section background-color="#ff0000" border-radius="0px 0px 16px 16px"');
   });
 
+  it('puts blocks on top of an image with text, in its text color', () => {
+    let document = createEmptyDocument('email');
+    const cover = createBlock('cover', 'email', { props: { textColor: '#ffffff' }, style: { backgroundImage: 'https://cdn.example.com/hero.jpg' } });
+    document = insertBlock(document, cover, { parentId: 'root', region: 0, index: 0 });
+    const heading = createBlock('heading', 'email', { taken: document.blocks });
+    document = insertBlock(document, heading, { parentId: cover.id, region: 0, index: 0 });
+    const output = build(document, { [`${OWNER}.block.${heading.id}.html`]: { da: 'Velkommen' } });
+    expect(output.mjml).toContain('<mj-section background-url="https://cdn.example.com/hero.jpg" background-size="cover"');
+    expect(output.mjml).toContain('padding="40px 35px 40px 35px"');
+    expect(output.mjml).toContain('<mj-text padding="8px 0px 8px 0px"');
+    expect(output.mjml).toContain('color: #ffffff !important');
+    expect(output.slots.find((slot) => slot.id === heading.id)).toMatchObject({ kind: 'rich', textColor: '#ffffff' });
+  });
+
   it('rounds the card and keeps canvas beside it on narrow screens', () => {
     const output = buildEmailMjml({ document: createEmptyDocument('email'), readText: () => '', theme: { ...theme, cardRadius: 16 } });
     expect(output.mjml).toContain('border-radius="16px" css-class="email-card-stack"');

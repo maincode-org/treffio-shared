@@ -79,6 +79,12 @@ export type ColumnsProps = {
   verticalAlign: VerticalAlign;
 };
 
+/** An image with blocks on top of it: the image is the block's background (`style.backgroundImage`). */
+export type CoverProps = {
+  /** Text color for headings and text inside that have none of their own. Null uses the theme. */
+  textColor: string | null;
+};
+
 /** Content written in the old single rich text editor. Its HTML lives on the owner's `.content` key. */
 export type ClassicProps = {
   /** Mirrors the legacy edge-to-edge banner option: the first image spans the card. */
@@ -93,12 +99,13 @@ export type BlockPropsByType = {
   divider: DividerProps;
   spacer: SpacerProps;
   columns: ColumnsProps;
+  cover: CoverProps;
   classic: ClassicProps;
 };
 
 export type BlockType = keyof BlockPropsByType;
 
-export const BLOCK_TYPES = ['heading', 'text', 'button', 'image', 'divider', 'spacer', 'columns', 'classic'] as const satisfies readonly BlockType[];
+export const BLOCK_TYPES = ['heading', 'text', 'button', 'image', 'divider', 'spacer', 'columns', 'cover', 'classic'] as const satisfies readonly BlockType[];
 
 type BlockNodeOf<T extends BlockType> = {
   id: string;
@@ -119,6 +126,7 @@ export type ImageBlock = BlockNodeByType['image'];
 export type DividerBlock = BlockNodeByType['divider'];
 export type SpacerBlock = BlockNodeByType['spacer'];
 export type ColumnsBlock = BlockNodeByType['columns'];
+export type CoverBlock = BlockNodeByType['cover'];
 export type ClassicBlock = BlockNodeByType['classic'];
 
 export type RootStyle = {

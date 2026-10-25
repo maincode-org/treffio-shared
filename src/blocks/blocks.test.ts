@@ -105,6 +105,23 @@ describe('tree operations', () => {
   });
 });
 
+describe('image with text', () => {
+  it('is a container with one region and keeps its children when parsed', () => {
+    const cover = createBlock('cover', 'email');
+    expect(cover.children).toEqual([[]]);
+    const result = parseBlockDocument({
+      version: 1,
+      surface: 'email',
+      root: { childIds: ['bcover'] },
+      blocks: { bcover: { type: 'cover', children: [['btext']] }, btext: { type: 'text' } },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.blocks.bcover?.children).toEqual([['btext']]);
+    expect(result.issues).toEqual([]);
+  });
+});
+
 describe('top spacing', () => {
   it('drops to 0 when an image opens the document and comes back when it no longer does', () => {
     const empty = createEmptyDocument('email');

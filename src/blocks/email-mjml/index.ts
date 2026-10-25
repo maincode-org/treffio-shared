@@ -1,7 +1,7 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
 import { blockCardEdges, columnWidths, imageCornerRadii, resolveBlockPadding, type TextField } from '../registry';
-import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, Padding } from '../types';
+import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, CoverBlock, Padding } from '../types';
 
 /** Resolved shell colors and fonts. Colors are hex or rgba(); `fontFamily` must not contain double quotes. */
 export type EmailShellTheme = {
@@ -27,7 +27,8 @@ export type EmailShellTheme = {
  * goes; the sender resolves tags in `raw`, post-processes by kind, and fills the token.
  */
 export type EmailSlot =
-  | { id: string; kind: 'rich'; blockId: string; raw: string }
+  /** `textColor` is the block's resolved color; headings and links inside the rich text take it too. */
+  | { id: string; kind: 'rich'; blockId: string; raw: string; textColor: string }
   | { id: string; kind: 'classic'; blockId: string; raw: string; padding: Padding; edgeToEdgeFirstImage: boolean }
   | { id: string; kind: 'button'; blockId: string; raw: string; anchorStyle: string }
   | { id: string; kind: 'preheader' }
@@ -162,16 +163,16 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
     case 'text': {
       const raw = input.readText(block, 'html');
       if (!raw.trim()) return '';
-      ctx.slots.push({ id: block.id, kind: 'rich', blockId: block.id, raw });
       const color = block.props.color ?? theme.textColor;
+      ctx.slots.push({ id: block.id, kind: 'rich', blockId: block.id, raw, textColor: color });
       return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(block.props.align)}" color="${attr(color)}"${bg}>${emailSlotToken(block.id)}</mj-text>`;
     }
     case 'heading': {
       const raw = inlineHtml(input.readText(block, 'html'));
       if (!raw.trim()) return '';
-      ctx.slots.push({ id: block.id, kind: 'rich', blockId: block.id, raw });
       const level = block.props.level;
       const color = block.props.color ?? theme.textColor;
+      ctx.slots.push({ id: block.id, kind: 'rich', blockId: block.id, raw, textColor: color });
       const style = [
         'margin: 0 !important',
         `font-family: ${theme.headingFontFamily ?? theme.fontFamily} !important`,
@@ -228,6 +229,7 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
     case 'spacer':
       return `<mj-spacer height="${block.props.height}px" padding="0"${bg} />`;
     case 'columns':
+    case 'cover':
       return '';
   }
 }
@@ -313,6 +315,24 @@ function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
 }
 
 /**
+ * An image with blocks on top: one section with the image as its background, its children in a
+ * single column inset by the side spacing. Children without a text color use the block's.
+ */
+function renderCover(block: CoverBlock, ctx: RenderContext): string {
+  const { document } = ctx.input;
+  const padding = resolveBlockPadding(block, document, false);
+  const inner = Math.max(1, ctx.cardWidth - padding.left - padding.right);
+  const childCtx: RenderContext = block.props.textColor ? { ...ctx, theme: { ...ctx.theme, textColor: block.props.textColor } } : ctx;
+  const children = (block.children?.[0] ?? [])
+    .map((id) => document.blocks[id])
+    .filter((child): child is BlockNode => !!child)
+    .map((child) => renderElement(child, childCtx, inner, true))
+    .join('');
+  const fill = blockFill(block, ctx);
+  return section(`<mj-column padding="0">${children}</mj-column>`, fill, padding, blockSectionRadius(block, fill, ctx));
+}
+
+/**
  * Builds the MJML for an email. The card matches the legacy shell: 570px wide with 20px of canvas
  * above and below, footer padded 35px. Everything that depends on the recipient is a slot.
  */
@@ -333,6 +353,10 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     if (!block) continue;
     if (block.type === 'columns') {
       sections.push(renderColumns(block, ctx));
+      continue;
+    }
+    if (block.type === 'cover') {
+      sections.push(renderCover(block, ctx));
       continue;
     }
     const element = renderElement(block, ctx, cardWidth, false);

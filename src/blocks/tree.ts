@@ -1,5 +1,5 @@
 import { createBlockId } from './ids';
-import { BLOCK_DEFINITIONS, columnCount } from './registry';
+import { BLOCK_DEFINITIONS, columnCount, regionCount } from './registry';
 import {
   ROOT_PARENT_ID,
   type BlockDocument,
@@ -21,8 +21,8 @@ export function createBlock<T extends BlockType>(
   const props = { ...definition.defaultProps(), ...options?.props };
   const style = { ...definition.defaultStyle(surface), ...options?.style };
   const node = { id: options?.id ?? createBlockId(options?.taken), type, props, style } as BlockNode;
-  if (node.type === 'columns') {
-    node.children = Array.from({ length: columnCount(node.props.layout) }, () => []);
+  if (definition.container) {
+    node.children = Array.from({ length: regionCount(node) }, () => []);
   }
   return node;
 }

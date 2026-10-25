@@ -103,7 +103,8 @@ export function imageCornerRadii(block: ImageBlock, document: Pick<BlockDocument
  * document has no space of its own above it, so the document's top spacing alone decides the gap.
  */
 export function resolveBlockPadding(block: BlockNode, document: Pick<BlockDocument, 'root'>, nested: boolean): Padding {
-  const side = nested || block.style.fullWidth ? 0 : document.root.style.paddingX;
+  // An image with text always spans the card (its image is the background); the side spacing insets its content.
+  const side = nested || (block.style.fullWidth && block.type !== 'cover') ? 0 : document.root.style.paddingX;
   const opensWithImage = !nested && block.type === 'image' && document.root.childIds[0] === block.id;
   return { top: opensWithImage ? 0 : block.style.padding.top, right: side, bottom: block.style.padding.bottom, left: side };
 }
@@ -146,6 +147,7 @@ const columnsProps = (): BlockPropsByType['columns'] => ({
   stackOnMobile: true,
   verticalAlign: 'top',
 });
+const coverProps = (): BlockPropsByType['cover'] => ({ textColor: null });
 const classicProps = (): BlockPropsByType['classic'] => ({ edgeToEdgeFirstImage: false });
 
 const withDefaults = <T extends object>(defaults: () => T, shape: z.ZodRawShape) =>
@@ -270,6 +272,18 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     defaultProps: columnsProps,
     defaultStyle: () => padded(8),
   },
+  cover: {
+    type: 'cover',
+    label: 'Image with text',
+    description: 'Headings, text and buttons on top of an image',
+    surfaces: ['email', 'in_app', 'page'],
+    insertable: true,
+    container: true,
+    textFields: [],
+    propsSchema: withDefaults(coverProps, { textColor: colorSchema }),
+    defaultProps: coverProps,
+    defaultStyle: () => padded(40),
+  },
   classic: {
     type: 'classic',
     label: 'Classic content',
@@ -329,6 +343,12 @@ export function columnWidths(layout: ColumnsLayout): number[] {
     default:
       return [50, 50];
   }
+}
+
+/** How many child lists (regions) a container block has: one per column, one for an image with text. */
+export function regionCount(block: BlockNode): number {
+  if (block.type === 'columns') return columnCount(block.props.layout);
+  return BLOCK_DEFINITIONS[block.type].container ? 1 : 0;
 }
 
 export function columnCount(layout: ColumnsLayout): number {
