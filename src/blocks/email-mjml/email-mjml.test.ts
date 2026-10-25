@@ -60,6 +60,19 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff"');
   });
 
+  it('rounds an opening full-width image and a closing background with the card', () => {
+    let document = createEmptyDocument('email');
+    document = { ...document, root: { ...document.root, style: { ...document.root.style, paddingTop: 0, paddingBottom: 0, showFooter: false } } };
+    const image = createBlock('image', 'email', { style: { fullWidth: true } });
+    document = insertBlock(document, image, { parentId: 'root', region: 0, index: 0 });
+    const text = createBlock('text', 'email', { taken: document.blocks, style: { backgroundColor: '#ff0000' } });
+    document = insertBlock(document, text, { parentId: 'root', region: 0, index: 1 });
+    const texts = { [`${OWNER}.block.${image.id}.src`]: { da: 'https://cdn.example.com/a.png' }, [`${OWNER}.block.${text.id}.html`]: { da: '<p>Hej</p>' } };
+    const output = buildEmailMjml({ document, readText: (block, field) => readBlockText(texts, OWNER, block, field, 'da'), theme: { ...theme, cardRadius: 16 } });
+    expect(output.mjml).toContain('<mj-image src="https://cdn.example.com/a.png" alt="" width="570px" align="center" padding="0px 0px 8px 0px" border-radius="16px 16px 0px 0px"');
+    expect(output.mjml).toContain('<mj-section background-color="#ff0000" border-radius="0px 0px 16px 16px"');
+  });
+
   it('rounds the card and keeps canvas beside it on narrow screens', () => {
     const output = buildEmailMjml({ document: createEmptyDocument('email'), readText: () => '', theme: { ...theme, cardRadius: 16 } });
     expect(output.mjml).toContain('border-radius="16px" css-class="email-card-stack"');

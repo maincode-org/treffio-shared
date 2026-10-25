@@ -1,6 +1,6 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
-import { columnWidths, resolveBlockPadding, type TextField } from '../registry';
+import { blockCardEdges, columnWidths, imageCornerRadii, resolveBlockPadding, type TextField } from '../registry';
 import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, Padding } from '../types';
 
 /** Resolved shell colors and fonts. Colors are hex or rgba(); `fontFamily` must not contain double quotes. */
@@ -130,6 +130,8 @@ type RenderContext = {
   theme: EmailShellTheme;
   slots: EmailSlot[];
   cardWidth: number;
+  /** Resolved card corner radius in px; 0 when the card is square. */
+  cardRadius: number;
 };
 
 /** Heading text is inline: paragraphs from the editor become line breaks. */
@@ -215,7 +217,8 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
       const available = Math.max(1, width - padding.left - padding.right);
       const imageWidth = Math.max(1, Math.round((available * block.props.width) / 100));
       const hrefAttr = href && !parseTagOnlyValue(href) ? ` href="${attr(href)}" target="_blank"` : '';
-      const radius = block.props.radius > 0 ? ` border-radius="${block.props.radius}px"` : '';
+      const corners = imageCornerRadii(block, input.document, nested, ctx.cardRadius);
+      const radius = radiusAttr(corners.top, corners.bottom);
       return `<mj-image src="${attr(src)}" alt="${attr(alt)}" width="${imageWidth}px" align="${block.props.align}" padding="${paddingAttr(padding)}"${radius}${hrefAttr}${bg} />`;
     }
     case 'divider': {
@@ -236,11 +239,27 @@ function backgroundImageAttrs(url: string): string {
   return ` background-url="${attr(url)}" background-size="cover" background-position="center center" background-repeat="no-repeat"`;
 }
 
-function section(inner: string, fill: SectionFill, padding: Partial<Padding> = {}): string {
+/** ` border-radius` for the given top and bottom corner radii, or nothing when both are 0. */
+function radiusAttr(top: number, bottom: number): string {
+  if (top <= 0 && bottom <= 0) return '';
+  return top === bottom ? ` border-radius="${px(top)}"` : ` border-radius="${px(top)} ${px(top)} ${px(bottom)} ${px(bottom)}"`;
+}
+
+function section(inner: string, fill: SectionFill, padding: Partial<Padding> = {}, radius = ''): string {
   const p: Padding = { top: 0, right: 0, bottom: 0, left: 0, ...padding };
   const color = fill.color ? ` background-color="${attr(fill.color)}"` : '';
   const image = fill.image ? backgroundImageAttrs(fill.image) : '';
-  return `<mj-section${color}${image} padding="${paddingAttr(p)}" css-class="email-card">${inner}</mj-section>`;
+  return `<mj-section${color}${image}${radius} padding="${paddingAttr(p)}" css-class="email-card">${inner}</mj-section>`;
+}
+
+/**
+ * A block background against a card edge rounds with the card. The card clips too, but not every
+ * client honors overflow on it, so the background rounds itself.
+ */
+function blockSectionRadius(block: BlockNode, fill: SectionFill, ctx: RenderContext): string {
+  if (ctx.cardRadius <= 0 || (!fill.color && !fill.image)) return '';
+  const edges = blockCardEdges(block, ctx.input.document, false);
+  return radiusAttr(edges.top ? ctx.cardRadius : 0, edges.bottom ? ctx.cardRadius : 0);
 }
 
 function spacerSection(height: number, fill: SectionFill): string {
@@ -289,7 +308,8 @@ function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
     .join('');
 
   const body = block.props.stackOnMobile ? columns : `<mj-group>${columns}</mj-group>`;
-  return section(body, blockFill(block, ctx), padding);
+  const fill = blockFill(block, ctx);
+  return section(body, fill, padding, blockSectionRadius(block, fill, ctx));
 }
 
 /**
@@ -300,7 +320,8 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   const theme = input.theme;
   const cardWidth = input.cardWidth ?? DEFAULT_EMAIL_CARD_WIDTH;
   const canvasPadding = input.canvasPadding ?? DEFAULT_EMAIL_CANVAS_PADDING;
-  const ctx: RenderContext = { input, theme, slots: [{ id: PREHEADER_SLOT_ID, kind: 'preheader' }], cardWidth };
+  const cardRadius = Math.max(0, Math.min(EMAIL_CARD_RADIUS_MAX, Math.round(theme.cardRadius ?? 0)));
+  const ctx: RenderContext = { input, theme, slots: [{ id: PREHEADER_SLOT_ID, kind: 'preheader' }], cardWidth, cardRadius };
   const { document } = input;
 
   const sections: string[] = [];
@@ -316,7 +337,8 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     }
     const element = renderElement(block, ctx, cardWidth, false);
     if (!element) continue;
-    sections.push(section(`<mj-column padding="0">${element}</mj-column>`, blockFill(block, ctx)));
+    const fill = blockFill(block, ctx);
+    sections.push(section(`<mj-column padding="0">${element}</mj-column>`, fill, {}, blockSectionRadius(block, fill, ctx)));
   }
 
   sections.push(spacerSection(document.root.style.paddingBottom, CARD_FILL));
@@ -338,7 +360,6 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   const canvasImageCss = canvasImage
     ? `.email-canvas { background-image: url("${imageUrl(canvasImage, input)}"); background-size: cover; background-position: center top; background-repeat: no-repeat; }`
     : '';
-  const cardRadius = Math.max(0, Math.min(EMAIL_CARD_RADIUS_MAX, Math.round(theme.cardRadius ?? 0)));
   // Rounded corners must clip blocks with a background of their own (Outlook on Windows stays square).
   const cardRadiusCss = cardRadius > 0 ? '.email-card-stack { overflow: hidden; }' : '';
   // On screens narrower than the card, keep some canvas beside it so it still reads as a card.

@@ -9,6 +9,7 @@ import {
   type BlockStyle,
   type BlockType,
   type ColumnsLayout,
+  type ImageBlock,
   type Padding,
   type Surface,
 } from './types';
@@ -66,6 +67,35 @@ const padded = (vertical: number): BlockStyle => ({
   backgroundImage: null,
   fullWidth: false,
 });
+
+/**
+ * Which card edges a top-level block sits against: the first block when there is no space above
+ * it, the last when there is no space or footer below it. Its background meets the card corners there.
+ */
+export function blockCardEdges(block: BlockNode, document: Pick<BlockDocument, 'root'>, nested: boolean): { top: boolean; bottom: boolean } {
+  if (nested) return { top: false, bottom: false };
+  const { childIds, style } = document.root;
+  return {
+    top: style.paddingTop === 0 && childIds[0] === block.id,
+    bottom: style.paddingBottom === 0 && !style.showFooter && childIds[childIds.length - 1] === block.id,
+  };
+}
+
+/**
+ * Corner radii (top, bottom) an image block's picture takes so it follows a rounded card: a
+ * full-width picture against a card edge gets the card radius there, or its own if that is larger.
+ */
+export function imageCornerRadii(block: ImageBlock, document: Pick<BlockDocument, 'root'>, nested: boolean, cardRadius: number): { top: number; bottom: number } {
+  const own = block.props.radius;
+  if (cardRadius <= 0) return { top: own, bottom: own };
+  const padding = resolveBlockPadding(block, document, nested);
+  const spansCard = block.props.width === 100 && padding.left === 0 && padding.right === 0;
+  const edges = blockCardEdges(block, document, nested);
+  return {
+    top: spansCard && edges.top && padding.top === 0 ? Math.max(own, cardRadius) : own,
+    bottom: spansCard && edges.bottom && padding.bottom === 0 ? Math.max(own, cardRadius) : own,
+  };
+}
 
 /**
  * The padding a block renders with: its own top/bottom, the document's side spacing for top-level
