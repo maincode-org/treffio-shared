@@ -15,6 +15,8 @@ export type EmailShellTheme = {
   canvasImage?: string | null;
   /** Image covering the card behind the blocks. Blocks without a color of their own let it show. */
   cardImage?: string | null;
+  /** Card corner radius in px, 0 to EMAIL_CARD_RADIUS_MAX. */
+  cardRadius?: number;
   buttonBackground: string;
   buttonText: string;
   dividerColor: string;
@@ -54,6 +56,9 @@ export const FOOTER_SLOT_ID = 'footer';
 export const DEFAULT_EMAIL_CARD_WIDTH = 570;
 export const DEFAULT_EMAIL_CANVAS_PADDING = 20;
 export const DEFAULT_EMAIL_FOOTER_INSET = 35;
+export const EMAIL_CARD_RADIUS_MAX = 40;
+/** Canvas kept beside the card on screens narrower than it. */
+export const EMAIL_CARD_MOBILE_MARGIN = 12;
 
 export function emailSlotToken(id: string): string {
   return `%%TREFFIO_SLOT_${id}%%`;
@@ -243,15 +248,17 @@ function spacerSection(height: number, fill: SectionFill): string {
   return section(`<mj-column padding="0"><mj-spacer height="${height}px" padding="0" /></mj-column>`, fill);
 }
 
-/** A card image must show through the sections, so they only paint the card color without one. */
-function cardFill(ctx: RenderContext): SectionFill {
-  return { color: ctx.theme.cardImage ? null : ctx.theme.cardColor };
-}
+/**
+ * Sections are transparent unless the block has a background of its own: the card wrapper behind
+ * them carries the card color and image. That keeps a card image and rounded corners visible, and
+ * dark-mode clients recolor one surface instead of each block (which left seams between them).
+ */
+const CARD_FILL: SectionFill = { color: null };
 
 function blockFill(block: BlockNode, ctx: RenderContext): SectionFill {
   const image = sanitizeBackgroundImageUrl(block.style.backgroundImage);
   return {
-    color: block.style.backgroundColor ?? cardFill(ctx).color,
+    color: block.style.backgroundColor,
     image: image ? imageUrl(image, ctx.input) : null,
   };
 }
@@ -298,7 +305,7 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
 
   const sections: string[] = [];
   const rootIds = document.root.childIds;
-  sections.push(spacerSection(document.root.style.paddingTop, cardFill(ctx)));
+  sections.push(spacerSection(document.root.style.paddingTop, CARD_FILL));
 
   for (const id of rootIds) {
     const block = document.blocks[id];
@@ -312,7 +319,7 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     sections.push(section(`<mj-column padding="0">${element}</mj-column>`, blockFill(block, ctx)));
   }
 
-  sections.push(spacerSection(document.root.style.paddingBottom, cardFill(ctx)));
+  sections.push(spacerSection(document.root.style.paddingBottom, CARD_FILL));
 
   if (document.root.style.showFooter) {
     ctx.slots.push({ id: FOOTER_SLOT_ID, kind: 'footer' });
@@ -320,7 +327,7 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
     sections.push(
       section(
         `<mj-column padding="0"><mj-text padding="0 ${footerInset}px ${footerInset}px ${footerInset}px">${emailSlotToken(FOOTER_SLOT_ID)}</mj-text></mj-column>`,
-        cardFill(ctx)
+        CARD_FILL
       )
     );
   }
@@ -331,7 +338,12 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   const canvasImageCss = canvasImage
     ? `.email-canvas { background-image: url("${imageUrl(canvasImage, input)}"); background-size: cover; background-position: center top; background-repeat: no-repeat; }`
     : '';
-  const css = [input.headCss ?? '', canvasImageCss].filter(Boolean).join('\n');
+  const cardRadius = Math.max(0, Math.min(EMAIL_CARD_RADIUS_MAX, Math.round(theme.cardRadius ?? 0)));
+  // Rounded corners must clip blocks with a background of their own (Outlook on Windows stays square).
+  const cardRadiusCss = cardRadius > 0 ? '.email-card-stack { overflow: hidden; }' : '';
+  // On screens narrower than the card, keep some canvas beside it so it still reads as a card.
+  const mobileCardCss = `@media only screen and (max-width: ${cardWidth + 2 * EMAIL_CARD_MOBILE_MARGIN - 1}px) { .email-card-stack { margin-left: ${EMAIL_CARD_MOBILE_MARGIN}px !important; margin-right: ${EMAIL_CARD_MOBILE_MARGIN}px !important; } }`;
+  const css = [input.headCss ?? '', canvasImageCss, cardRadiusCss, mobileCardCss].filter(Boolean).join('\n');
   const head = [
     '<mj-head>',
     `<mj-preview>${emailSlotToken(PREHEADER_SLOT_ID)}</mj-preview>`,
@@ -354,7 +366,8 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   const canvasSpacer = canvasPadding > 0 ? `<mj-section padding="0"><mj-column padding="0"><mj-spacer height="${canvasPadding}px" padding="0" /></mj-column></mj-section>` : '';
   const cardImage = sanitizeBackgroundImageUrl(theme.cardImage);
   const cardImageAttrs = cardImage ? backgroundImageAttrs(imageUrl(cardImage, input)) : '';
-  const card = `<mj-wrapper padding="0" background-color="${attr(theme.cardColor)}"${cardImageAttrs} css-class="email-card-stack">${sections.join('')}</mj-wrapper>`;
+  const cardRadiusAttr = cardRadius > 0 ? ` border-radius="${cardRadius}px"` : '';
+  const card = `<mj-wrapper padding="0" background-color="${attr(theme.cardColor)}"${cardImageAttrs}${cardRadiusAttr} css-class="email-card-stack">${sections.join('')}</mj-wrapper>`;
   const body = `<mj-body background-color="${attr(theme.canvasColor)}" width="${cardWidth}px" css-class="email-canvas">${canvasSpacer}${card}${canvasSpacer}</mj-body>`;
 
   return { mjml: `<mjml>${head}${body}</mjml>`, slots: ctx.slots };

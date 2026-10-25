@@ -55,7 +55,17 @@ describe('buildEmailMjml', () => {
     const output = build(createEmptyDocument('email'), {});
     const unsafe = buildEmailMjml({ document: createEmptyDocument('email'), readText: () => '', theme: { ...theme, canvasImage: 'https://x.com/a.jpg"); color: red; ("' } });
     expect(unsafe.mjml).not.toContain('background-image');
-    expect(output.mjml).toContain('<mj-section background-color="#ffffff"');
+    // Sections leave the card color to the wrapper behind them.
+    expect(output.mjml).not.toContain('<mj-section background-color=');
+    expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff"');
+  });
+
+  it('rounds the card and keeps canvas beside it on narrow screens', () => {
+    const output = buildEmailMjml({ document: createEmptyDocument('email'), readText: () => '', theme: { ...theme, cardRadius: 16 } });
+    expect(output.mjml).toContain('border-radius="16px" css-class="email-card-stack"');
+    expect(output.mjml).toContain('.email-card-stack { overflow: hidden; }');
+    expect(output.mjml).toContain('@media only screen and (max-width: 593px) { .email-card-stack { margin-left: 12px !important;');
+    expect(build(createEmptyDocument('email'), {}).mjml).not.toContain('border-radius=');
   });
 
   it('leaves the footer out when the email hides it', () => {
