@@ -26,7 +26,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 }
 
 export function defaultRootStyle(surface: Surface): RootStyle {
-  return { paddingTop: 24, paddingBottom: 8, paddingX: defaultSideInset(surface) };
+  return { paddingTop: 24, paddingBottom: 8, paddingX: defaultSideInset(surface), showFooter: true };
 }
 
 function parseRootStyle(raw: unknown, surface: Surface): RootStyle {
@@ -36,6 +36,7 @@ function parseRootStyle(raw: unknown, surface: Surface): RootStyle {
     paddingTop: clampInt(raw.paddingTop, 0, PADDING_MAX, fallback.paddingTop),
     paddingBottom: clampInt(raw.paddingBottom, 0, PADDING_MAX, fallback.paddingBottom),
     paddingX: clampInt(raw.paddingX, 0, PADDING_MAX, fallback.paddingX),
+    showFooter: typeof raw.showFooter === 'boolean' ? raw.showFooter : fallback.showFooter,
   };
 }
 

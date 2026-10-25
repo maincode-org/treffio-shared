@@ -34,6 +34,14 @@ describe('buildEmailMjml', () => {
     expect(output.mjml).toContain('<mj-body background-color="#f5f8fa" width="570px" css-class="email-canvas">');
   });
 
+  it('leaves the footer out when the email hides it', () => {
+    const legacy = createLegacyDocument('email');
+    const hidden = { ...legacy, root: { ...legacy.root, style: { ...legacy.root.style, showFooter: false } } };
+    const output = build(hidden, { [`${OWNER}.content`]: { da: '<p>Hej</p>' } });
+    expect(output.slots.map((slot) => slot.kind)).toEqual(['preheader', 'classic']);
+    expect(output.mjml).not.toContain(emailSlotToken('footer'));
+  });
+
   it('sets heading blocks in the heading font', () => {
     let document = createEmptyDocument('email');
     const heading = createBlock('heading', 'email');

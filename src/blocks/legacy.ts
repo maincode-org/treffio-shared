@@ -16,7 +16,7 @@ export function createLegacyDocument(surface: Surface, options?: { edgeToEdgeFir
   return {
     version: BLOCK_DOCUMENT_VERSION,
     surface,
-    root: { childIds: [classic.id], style: { paddingTop: 0, paddingBottom: 0, paddingX: defaultSideInset(surface) } },
+    root: { childIds: [classic.id], style: { paddingTop: 0, paddingBottom: 0, paddingX: defaultSideInset(surface), showFooter: true } },
     blocks: { [classic.id]: classic },
   };
 }
@@ -33,6 +33,7 @@ export function isLegacyOnlyDocument(document: BlockDocument): boolean {
     document.root.style.paddingTop === 0 &&
     document.root.style.paddingBottom === 0 &&
     document.root.style.paddingX === defaultSideInset(document.surface) &&
+    document.root.style.showFooter &&
     only.style.backgroundColor === null &&
     !only.style.fullWidth &&
     padding.top === defaults.padding.top &&

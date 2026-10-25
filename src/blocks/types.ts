@@ -126,6 +126,8 @@ export type RootStyle = {
   paddingBottom: number;
   /** Side spacing, applied to every top-level block that is not full width. */
   paddingX: number;
+  /** False leaves the event footer (contact details, custom footer text, Treffio credit) out of this email. */
+  showFooter: boolean;
 };
 
 export const BLOCK_DOCUMENT_VERSION = 1;

@@ -284,14 +284,16 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
 
   sections.push(spacerSection(document.root.style.paddingBottom, theme.cardColor));
 
-  ctx.slots.push({ id: FOOTER_SLOT_ID, kind: 'footer' });
-  const footerInset = DEFAULT_EMAIL_FOOTER_INSET;
-  sections.push(
-    section(
-      `<mj-column padding="0"><mj-text padding="0 ${footerInset}px ${footerInset}px ${footerInset}px">${emailSlotToken(FOOTER_SLOT_ID)}</mj-text></mj-column>`,
-      theme.cardColor
-    )
-  );
+  if (document.root.style.showFooter) {
+    ctx.slots.push({ id: FOOTER_SLOT_ID, kind: 'footer' });
+    const footerInset = DEFAULT_EMAIL_FOOTER_INSET;
+    sections.push(
+      section(
+        `<mj-column padding="0"><mj-text padding="0 ${footerInset}px ${footerInset}px ${footerInset}px">${emailSlotToken(FOOTER_SLOT_ID)}</mj-text></mj-column>`,
+        theme.cardColor
+      )
+    );
+  }
 
   const css = input.headCss ?? '';
   const head = [
