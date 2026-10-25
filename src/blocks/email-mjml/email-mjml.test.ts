@@ -31,12 +31,14 @@ describe('buildEmailMjml', () => {
     expect(classic?.kind === 'classic' && classic.raw).toContain('{{guest.first_name}}');
     expect(output.mjml).toContain(emailSlotToken('classic'));
     expect(output.mjml).not.toContain('{{');
-    expect(output.mjml).toContain('width="610px"');
+    expect(output.mjml).toContain('<mj-body background-color="#f5f8fa" width="570px" css-class="email-canvas">');
   });
 
-  it('puts the card color behind every block so dark mode shows no seams between them', () => {
+  it('puts the card color behind every block and keeps the canvas free of borders, for dark mode', () => {
     const output = build(createLegacyDocument('email'), {});
-    expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff" border="20px solid #f5f8fa" css-class="email-canvas">');
+    expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff" css-class="email-card-stack">');
+    expect(output.mjml).toContain('<mj-spacer height="20px" padding="0" /></mj-column></mj-section><mj-wrapper');
+    expect(output.mjml).not.toContain('border=');
   });
 
   it('skips empty blocks and builds a link-tag button', () => {

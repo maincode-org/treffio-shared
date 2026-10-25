@@ -36,7 +36,7 @@ export type EmailMjmlInput = {
   transformUrl?: (url: string) => string;
   /** Inner card width in px. Defaults to the legacy 570. */
   cardWidth?: number;
-  /** Space around the card in px. Defaults to the legacy 20. */
+  /** Canvas above and below the card in px. Defaults to the legacy 20. */
   canvasPadding?: number;
 };
 
@@ -254,8 +254,8 @@ function renderColumns(block: ColumnsBlock, ctx: RenderContext): string {
 }
 
 /**
- * Builds the MJML for an email. The card matches the legacy shell: 570px wide inside a 20px
- * canvas, footer padded 35px. Everything that depends on the recipient is a slot.
+ * Builds the MJML for an email. The card matches the legacy shell: 570px wide with 20px of canvas
+ * above and below, footer padded 35px. Everything that depends on the recipient is a slot.
  */
 export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   const theme = input.theme;
@@ -308,10 +308,12 @@ export function buildEmailMjml(input: EmailMjmlInput): EmailMjmlOutput {
   ].join('');
 
   // Each block is its own table. Dark-mode clients (Outlook) recolor them one by one and leave
-  // hairline gaps between them, so the wrapper behind them carries the card color and the canvas
-  // around the card is a border instead of padding over the canvas color.
-  const canvasBorder = canvasPadding > 0 ? ` border="${canvasPadding}px solid ${attr(theme.canvasColor)}"` : '';
-  const body = `<mj-body background-color="${attr(theme.canvasColor)}" width="${cardWidth + canvasPadding * 2}px"><mj-wrapper padding="0" background-color="${attr(theme.cardColor)}"${canvasBorder} css-class="email-canvas">${sections.join('')}</mj-wrapper></mj-body>`;
+  // hairline gaps between them, so a card-colored wrapper sits directly behind them. The canvas is
+  // the body itself (borders would keep their light color in dark mode), with spacers above and
+  // below the card; on screens wider than the card its sides show the body color.
+  const canvasSpacer = canvasPadding > 0 ? `<mj-section padding="0"><mj-column padding="0"><mj-spacer height="${canvasPadding}px" padding="0" /></mj-column></mj-section>` : '';
+  const card = `<mj-wrapper padding="0" background-color="${attr(theme.cardColor)}" css-class="email-card-stack">${sections.join('')}</mj-wrapper>`;
+  const body = `<mj-body background-color="${attr(theme.canvasColor)}" width="${cardWidth}px" css-class="email-canvas">${canvasSpacer}${card}${canvasSpacer}</mj-body>`;
 
   return { mjml: `<mjml>${head}${body}</mjml>`, slots: ctx.slots };
 }
