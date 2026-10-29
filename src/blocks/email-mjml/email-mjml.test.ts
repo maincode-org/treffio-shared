@@ -133,6 +133,29 @@ describe('buildEmailMjml', () => {
     expect(build(document, texts).mjml).toContain(`font-family: ${theme.fontFamily} !important`);
   });
 
+  it('uses the theme body sizes for normal and small text, and heading 5', () => {
+    let document = createEmptyDocument('email');
+    const normal = createBlock('text', 'email');
+    document = insertBlock(document, normal, { parentId: 'root', region: 0, index: 0 });
+    const small = createBlock('text', 'email', { taken: document.blocks, props: { size: 'small' } });
+    document = insertBlock(document, small, { parentId: 'root', region: 0, index: 1 });
+    const heading = createBlock('heading', 'email', { taken: document.blocks, props: { level: 5 } });
+    document = insertBlock(document, heading, { parentId: 'root', region: 0, index: 2 });
+    const texts = {
+      [`${OWNER}.block.${normal.id}.html`]: { da: '<p>Normal</p>' },
+      [`${OWNER}.block.${small.id}.html`]: { da: '<p>Small</p>' },
+      [`${OWNER}.block.${heading.id}.html`]: { da: 'Tiny title' },
+    };
+    const output = buildEmailMjml({
+      document,
+      readText: (block, field) => readBlockText(texts, OWNER, block, field, 'da'),
+      theme: { ...theme, textSize: 17, smallTextSize: 11 },
+    });
+    expect(output.mjml).toContain('font-size="17px"');
+    expect(output.mjml).toContain('font-size="11px"');
+    expect(output.mjml).toContain('font-size: 14px !important');
+  });
+
   it('puts the card color behind every block and keeps the canvas free of borders, for dark mode', () => {
     const output = build(createLegacyDocument('email'), {});
     expect(output.mjml).toContain('<mj-wrapper padding="0" background-color="#ffffff" css-class="email-card-stack">');

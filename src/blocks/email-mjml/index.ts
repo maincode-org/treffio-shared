@@ -1,6 +1,6 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
-import { blockCardEdges, columnWidths, imageCornerRadii, resolveBlockPadding, type TextField } from '../registry';
+import { blockCardEdges, clampEmailBodyTextSize, columnWidths, EMAIL_BODY_TEXT_SIZE, headingFontSize, imageCornerRadii, resolveBlockPadding, type TextField } from '../registry';
 import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, CoverBlock, Padding } from '../types';
 
 /** Resolved shell colors and fonts. Colors are hex or rgba(); `fontFamily` must not contain double quotes. */
@@ -11,6 +11,10 @@ export type EmailShellTheme = {
   fontFamily: string;
   /** Heading blocks. Defaults to `fontFamily`. Must not contain double quotes either. */
   headingFontFamily?: string;
+  /** Body text size in px. Defaults to 14. */
+  textSize?: number;
+  /** Small body text size in px. Defaults to 12. */
+  smallTextSize?: number;
   /** Image covering the canvas around the card (CSS only; Outlook on Windows shows `canvasColor`). */
   canvasImage?: string | null;
   /** Image covering the card behind the blocks. Blocks without a color of their own let it show. */
@@ -74,9 +78,13 @@ export function fillEmailSlots(html: string, slots: readonly EmailSlot[], conten
   return result;
 }
 
-const HEADING_SIZES: Record<1 | 2 | 3, number> = { 1: 32, 2: 24, 3: 18 };
-
 const px = (value: number) => `${Math.max(0, Math.round(value))}px`;
+
+function themeBodySize(theme: EmailShellTheme, size: 'normal' | 'small'): number {
+  return size === 'small'
+    ? clampEmailBodyTextSize(theme.smallTextSize ?? EMAIL_BODY_TEXT_SIZE.small, EMAIL_BODY_TEXT_SIZE.small)
+    : clampEmailBodyTextSize(theme.textSize ?? EMAIL_BODY_TEXT_SIZE.normal, EMAIL_BODY_TEXT_SIZE.normal);
+}
 const paddingAttr = (padding: Padding) => `${px(padding.top)} ${px(padding.right)} ${px(padding.bottom)} ${px(padding.left)}`;
 const attr = (value: string) => escapeAttribute(value);
 
@@ -164,8 +172,9 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
       const raw = input.readText(block, 'html');
       if (!raw.trim()) return '';
       const color = block.props.color ?? theme.textColor;
+      const fontSize = themeBodySize(theme, block.props.size);
       ctx.slots.push({ id: block.id, kind: 'rich', blockId: block.id, raw, textColor: color });
-      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(block.props.align)}" color="${attr(color)}"${bg}>${emailSlotToken(block.id)}</mj-text>`;
+      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(block.props.align)}" color="${attr(color)}" font-size="${fontSize}px" line-height="1.4"${bg}>${emailSlotToken(block.id)}</mj-text>`;
     }
     case 'heading': {
       const raw = inlineHtml(input.readText(block, 'html'));
@@ -176,7 +185,7 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
       const style = [
         'margin: 0 !important',
         `font-family: ${theme.headingFontFamily ?? theme.fontFamily} !important`,
-        `font-size: ${HEADING_SIZES[level]}px !important`,
+        `font-size: ${headingFontSize(level)}px !important`,
         'font-weight: 700 !important',
         'line-height: 1.2 !important',
         `color: ${color} !important`,

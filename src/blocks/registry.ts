@@ -9,9 +9,11 @@ import {
   type BlockStyle,
   type BlockType,
   type ColumnsLayout,
+  type HeadingLevel,
   type ImageBlock,
   type Padding,
   type Surface,
+  TEXT_SIZES,
 } from './types';
 
 const colorSchema = z
@@ -129,8 +131,28 @@ export type BlockDefinition<T extends BlockType = BlockType> = {
   defaultStyle: (surface: Surface) => BlockStyle;
 };
 
+/** Pixel sizes for heading levels 1–5. The body sizes (normal / small) live on the email theme. */
+export const HEADING_SIZES: Record<HeadingLevel, number> = { 1: 32, 2: 24, 3: 20, 4: 16, 5: 14 };
+
+export function headingFontSize(level: HeadingLevel): number {
+  return HEADING_SIZES[level] ?? HEADING_SIZES[2];
+}
+
+/** Theme sliders for Text blocks: normal and small. */
+export const EMAIL_BODY_TEXT_SIZE = { min: 10, max: 22, normal: 14, small: 12 } as const;
+
+export function clampEmailBodyTextSize(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(EMAIL_BODY_TEXT_SIZE.max, Math.max(EMAIL_BODY_TEXT_SIZE.min, Math.round(value)));
+}
+
+const headingLevelSchema = z
+  .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)])
+  .catch(2);
+const textSizeSchema = z.enum(TEXT_SIZES).catch('normal');
+
 const headingProps = (): BlockPropsByType['heading'] => ({ level: 2, align: 'left', color: null });
-const textProps = (): BlockPropsByType['text'] => ({ align: 'left', color: null });
+const textProps = (): BlockPropsByType['text'] => ({ align: 'left', color: null, size: 'normal' });
 const buttonProps = (): BlockPropsByType['button'] => ({
   align: 'left',
   fullWidth: false,
@@ -177,7 +199,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     container: false,
     textFields: [{ field: 'html', kind: 'inline', label: 'Heading' }],
     propsSchema: withDefaults(headingProps, {
-      level: z.union([z.literal(1), z.literal(2), z.literal(3)]).catch(2),
+      level: headingLevelSchema,
       align: alignSchema,
       color: colorSchema,
     }),
@@ -192,7 +214,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     insertable: true,
     container: false,
     textFields: [{ field: 'html', kind: 'rich', label: 'Text' }],
-    propsSchema: withDefaults(textProps, { align: alignSchema, color: colorSchema }),
+    propsSchema: withDefaults(textProps, { align: alignSchema, color: colorSchema, size: textSizeSchema }),
     defaultProps: textProps,
     defaultStyle: () => padded(8),
   },

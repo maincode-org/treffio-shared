@@ -201,7 +201,7 @@ describe('document parsing', () => {
       root: { childIds: ['btxt'] },
       blocks: { btxt: { type: 'text', props: { color: 'red;background:url(x)' }, style: { backgroundColor: 'rgba(0,0,0,0.5)' } } },
     });
-    expect(result.ok && result.document.blocks.btxt?.props).toEqual({ align: 'left', color: null });
+    expect(result.ok && result.document.blocks.btxt?.props).toEqual({ align: 'left', color: null, size: 'normal' });
     expect(result.ok && result.document.blocks.btxt?.style.backgroundColor).toBe('rgba(0, 0, 0, 0.5)');
   });
 });

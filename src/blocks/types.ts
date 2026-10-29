@@ -24,7 +24,8 @@ export type BlockStyle = {
   fullWidth: boolean;
 };
 
-export type HeadingLevel = 1 | 2 | 3;
+export const HEADING_LEVELS = [1, 2, 3, 4, 5] as const;
+export type HeadingLevel = (typeof HEADING_LEVELS)[number];
 
 export type HeadingProps = {
   level: HeadingLevel;
@@ -33,9 +34,14 @@ export type HeadingProps = {
   color: string | null;
 };
 
+export const TEXT_SIZES = ['normal', 'small'] as const;
+export type TextSize = (typeof TEXT_SIZES)[number];
+
 export type TextProps = {
   align: Align;
   color: string | null;
+  /** Theme-controlled body size. `small` uses the theme's small text size. */
+  size: TextSize;
 };
 
 export type ButtonProps = {
