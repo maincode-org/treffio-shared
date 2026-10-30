@@ -11,3 +11,4 @@ export * from './legacy';
 export * from './content';
 export * from './rows';
 export * from './event-blocks';
+export * from './image-edits';

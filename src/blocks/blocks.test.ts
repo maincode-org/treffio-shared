@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLASSIC_BLOCK_ID,
+  EDGE_SHAPE_SIZE,
   adjustTopSpacing,
+  hasImageEdits,
+  originalImageUrl,
   copyBlockTexts,
   createBlock,
   createEmptyDocument,
@@ -156,6 +159,41 @@ describe('document parsing', () => {
     expect(result.document.root.style.paddingTop).toBe(200);
     expect(result.document.root.style.paddingX).toBe(35);
     expect(result.issues).toHaveLength(2);
+  });
+
+  it('keeps valid image edits and cleans up broken ones', () => {
+    const result = parseBlockDocument({
+      version: 1,
+      surface: 'email',
+      root: { childIds: ['bimg', 'bimg2', 'bimg3'] },
+      blocks: {
+        bimg: {
+          type: 'image',
+          props: {
+            imageEdits: {
+              edits: { edges: { top: null, bottom: { shape: 'wave', size: 99, flip: true }, fill: 'background', color: '#FFF' } },
+              originals: { 'https://x.dk/edited.jpg': 'https://x.dk/original.jpg', 'javascript:alert(1)': 'https://x.dk/a.jpg' },
+            },
+          },
+        },
+        bimg2: { type: 'image', props: { imageEdits: { edits: { edges: { top: { shape: 'zigzag', size: 5 }, bottom: null } } } } },
+        bimg3: { type: 'image', props: { imageEdits: 'broken' } },
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const props = (id: string) => {
+      const block = result.document.blocks[id];
+      return block?.type === 'image' ? block.props.imageEdits : undefined;
+    };
+    expect(props('bimg')).toEqual({
+      edits: { edges: { top: null, bottom: { shape: 'wave', size: EDGE_SHAPE_SIZE.max, flip: true }, fill: 'background', color: '#fff' } },
+      originals: { 'https://x.dk/edited.jpg': 'https://x.dk/original.jpg' },
+    });
+    expect(props('bimg2')?.edits.edges?.top).toBeNull();
+    expect(hasImageEdits(props('bimg2')?.edits)).toBe(false);
+    expect(props('bimg3')).toBeNull();
+    expect(originalImageUrl(props('bimg'), 'https://x.dk/edited.jpg')).toBe('https://x.dk/original.jpg');
   });
 
   it('turns the old image fullBleed prop into a full-width block', () => {

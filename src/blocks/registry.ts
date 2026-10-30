@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizeColor } from './colors';
 import { sanitizeBackgroundImageUrl } from './html';
+import { imageEditStateSchema } from './image-edits';
 import {
   CALLOUT_VARIANTS,
   COLUMN_LAYOUTS,
@@ -163,7 +164,7 @@ const buttonProps = (): BlockPropsByType['button'] => ({
   textColor: null,
   radius: 6,
 });
-const imageProps = (): BlockPropsByType['image'] => ({ width: 100, align: 'center', radius: 0 });
+const imageProps = (): BlockPropsByType['image'] => ({ width: 100, align: 'center', radius: 0, imageEdits: null });
 const dividerProps = (): BlockPropsByType['divider'] => ({ color: null, thickness: 1, lineStyle: 'solid' });
 const spacerProps = (): BlockPropsByType['spacer'] => ({ height: 24 });
 const columnsProps = (): BlockPropsByType['columns'] => ({
@@ -172,7 +173,14 @@ const columnsProps = (): BlockPropsByType['columns'] => ({
   stackOnMobile: true,
   verticalAlign: 'top',
 });
-const coverProps = (): BlockPropsByType['cover'] => ({ textColor: null, height: null, verticalAlign: 'middle', imageWidth: null, imageHeight: null });
+const coverProps = (): BlockPropsByType['cover'] => ({
+  textColor: null,
+  height: null,
+  verticalAlign: 'middle',
+  imageWidth: null,
+  imageHeight: null,
+  imageEdits: null,
+});
 
 export const COVER_HEIGHT_MIN = 60;
 export const COVER_HEIGHT_MAX = 900;
@@ -316,6 +324,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       width: intIn(10, 100, 100),
       align: z.enum(['left', 'center', 'right']).catch('center'),
       radius: intIn(0, 40, 0),
+      imageEdits: imageEditStateSchema,
     }),
     defaultProps: imageProps,
     defaultStyle: () => padded(8),
@@ -379,6 +388,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       verticalAlign: z.enum(['top', 'middle', 'bottom']).catch('middle'),
       imageWidth: nullableIntIn(1, 20000),
       imageHeight: nullableIntIn(1, 20000),
+      imageEdits: imageEditStateSchema,
     }),
     defaultProps: coverProps,
     defaultStyle: () => padded(40),

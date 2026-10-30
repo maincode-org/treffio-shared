@@ -1,3 +1,5 @@
+import type { ImageEditState } from './image-edits';
+
 /** Language columns on `event_text`. */
 export const LOCALES = ['en', 'da', 'de', 'swe'] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -58,6 +60,8 @@ export type ImageProps = {
   width: number;
   align: Align;
   radius: number;
+  /** Edits baked into the image file (e.g. shaped edges). Null: the image is used as uploaded. */
+  imageEdits: ImageEditState | null;
 };
 
 export type DividerLineStyle = 'solid' | 'dashed' | 'dotted';
@@ -96,6 +100,8 @@ export type CoverProps = {
   /** The image's pixel size, measured when it is chosen. Needed to fit the block to the image. */
   imageWidth: number | null;
   imageHeight: number | null;
+  /** Edits baked into the background image file (e.g. shaped edges). */
+  imageEdits: ImageEditState | null;
 };
 
 /** Content written in the old single rich text editor. Its HTML lives on the owner's `.content` key. */
