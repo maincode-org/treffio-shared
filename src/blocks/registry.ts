@@ -367,7 +367,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
   },
   cover: {
     type: 'cover',
-    label: 'Image with content',
+    label: 'Content image',
     description: 'Any blocks on top of an image',
     surfaces: ['email', 'in_app', 'page'],
     insertable: true,
