@@ -143,13 +143,14 @@ type RenderContext = {
   cardRadius: number;
 };
 
-/** Heading text is inline: paragraphs from the editor become line breaks. */
+/** Heading text is inline: paragraphs from the editor become line breaks, keeping leading indentation. */
 export function inlineHtml(html: string): string {
-  return html
+  const unwrapped = html
     .replace(/<\/(p|div|h[1-6])>\s*<(p|div|h[1-6])\b[^>]*>/gi, '<br>')
     .replace(/<\/?(p|div|h[1-6])\b[^>]*>/gi, '')
     .replace(/(<br\s*\/?>\s*)+$/i, '')
-    .trim();
+    .replace(/\s+$/, '');
+  return unwrapped.trim() ? unwrapped : '';
 }
 
 function textAlign(align: Align): string {
