@@ -1,13 +1,13 @@
 import { isBlankHtml, stripHtml } from './html';
 import { textKeyForBlock } from './keys';
-import { BLOCK_DEFINITIONS } from './registry';
+import { BLOCK_DEFINITIONS, sanitizeCalendarCode, type TextField } from './registry';
 import { readLocalized, type TextMap } from './texts';
 import { orderedBlockIds } from './tree';
 import type { BlockDocument, BlockNode, Locale } from './types';
 
 type ReadOptions = { ownerKey: string; texts: TextMap; lang: Locale; fallbacks?: readonly Locale[] };
 
-function read(block: BlockNode, field: 'html' | 'label' | 'src', options: ReadOptions): string {
+function read(block: BlockNode, field: TextField, options: ReadOptions): string {
   return readLocalized(options.texts[textKeyForBlock(options.ownerKey, block, field)], options.lang, options.fallbacks ?? []);
 }
 
@@ -17,11 +17,19 @@ export function blockHasContent(block: BlockNode, options: ReadOptions): boolean
     case 'heading':
     case 'text':
     case 'classic':
+    case 'callout':
       return !isBlankHtml(read(block, 'html', options));
     case 'button':
       return read(block, 'label', options).trim().length > 0;
     case 'image':
       return read(block, 'src', options).trim().length > 0;
+    case 'rsvp':
+    case 'ticket':
+      return true;
+    case 'calendar':
+      return block.props.source === 'event' || !!sanitizeCalendarCode(block.props.customCode);
+    case 'event_info':
+      return read(block, 'when', options).trim().length > 0 || read(block, 'where', options).trim().length > 0;
     default:
       return false;
   }
@@ -41,12 +49,15 @@ export function documentPlainText(document: BlockDocument, options: ReadOptions)
   for (const id of orderedBlockIds(document)) {
     const block = document.blocks[id];
     if (!block) continue;
-    if (block.type === 'heading' || block.type === 'text' || block.type === 'classic') {
+    if (block.type === 'heading' || block.type === 'text' || block.type === 'classic' || block.type === 'callout') {
       const text = stripHtml(read(block, 'html', options));
       if (text) parts.push(text);
     } else if (block.type === 'button') {
       const label = read(block, 'label', options).trim();
       if (label) parts.push(label);
+    } else if (block.type === 'event_info') {
+      const rows = [read(block, 'when', options).trim(), read(block, 'where', options).trim()].filter(Boolean);
+      if (rows.length > 0) parts.push(rows.join('\n'));
     }
   }
   return parts.join('\n\n');

@@ -10,3 +10,4 @@ export * from './tree';
 export * from './legacy';
 export * from './content';
 export * from './rows';
+export * from './event-blocks';

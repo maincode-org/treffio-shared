@@ -216,6 +216,51 @@ describe('buildEmailMjml', () => {
   });
 });
 
+describe('event blocks', () => {
+  function single(type: Parameters<typeof createBlock>[0], props: Record<string, unknown> = {}) {
+    const document = createEmptyDocument('email');
+    const block = createBlock(type, 'email', { props: props as never });
+    return { block, document: insertBlock(document, block, { parentId: 'root', region: 0, index: 0 }) };
+  }
+
+  it('links RSVP buttons with the registration tags and their labels', () => {
+    const { block, document } = single('rsvp');
+    const output = build(document, { [`${OWNER}.block.${block.id}.label`]: { da: 'Tilmeld' } });
+    const buttons = output.slots.filter((slot) => slot.kind === 'button').map((slot) => (slot.kind === 'button' ? slot.raw : ''));
+    expect(buttons).toEqual(['{{guest.registration_form_url;Tilmeld}}', '{{guest.decline_form_url;I won&#39;t attend}}']);
+  });
+
+  it('leaves the decline button out and uses shared page links when asked', () => {
+    const { document } = single('rsvp', { showDecline: false, personal: false, direct: false });
+    const buttons = build(document, {}).slots.filter((slot) => slot.kind === 'button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]?.kind === 'button' && buttons[0].raw).toBe('{{event.registration_page_url;Start registration}}');
+  });
+
+  it('passes ticket options as tag parameters', () => {
+    const { document } = single('ticket', { qrSize: 200, showDetails: false });
+    const ticket = build(document, {}).slots.find((slot) => slot.kind === 'ticket');
+    expect(ticket?.kind === 'ticket' && ticket.raw).toBe('{{guest.personal_ticket;;size=200&details=0}}');
+  });
+
+  it('renders event calendar buttons and drops an invalid custom date', () => {
+    expect(build(single('calendar').document, {}).slots.find((slot) => slot.kind === 'calendar')).toMatchObject({ raw: '{{event.add_to_calendar}}' });
+    const custom = single('calendar', { source: 'custom', customCode: 'calendar.custom:"><script>' });
+    expect(build(custom.document, {}).slots.some((slot) => slot.kind === 'calendar')).toBe(false);
+  });
+
+  it('puts callout and when & where texts in rich slots', () => {
+    const callout = single('callout', { variant: 'outline' });
+    const calloutOutput = build(callout.document, { [`${OWNER}.block.${callout.block.id}.html`]: { da: '<p>Husk pas</p>' } });
+    expect(calloutOutput.slots.find((slot) => slot.id === callout.block.id)).toMatchObject({ kind: 'rich', raw: '<p>Husk pas</p>' });
+    expect(calloutOutput.mjml).toContain('border: 1px solid');
+
+    const info = single('event_info');
+    const infoOutput = build(info.document, { [`${OWNER}.block.${info.block.id}.when`]: { da: '{{event.start_date}}' } });
+    expect(infoOutput.slots.filter((slot) => slot.kind === 'rich').map((slot) => slot.id)).toEqual([`${info.block.id}__when`]);
+  });
+});
+
 describe('buttons', () => {
   it('escapes plain links and drops unsafe schemes', () => {
     expect(buttonRawHtml('Go <now>', 'example.com/a?b=1&c=2')).toBe('<a href="https://example.com/a?b=1&amp;c=2" target="_blank">Go &lt;now&gt;</a>');

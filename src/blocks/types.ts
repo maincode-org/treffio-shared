@@ -104,6 +104,81 @@ export type ClassicProps = {
   edgeToEdgeFirstImage: boolean;
 };
 
+export const RSVP_DECLINE_STYLES = ['outline', 'solid'] as const;
+export type RsvpDeclineStyle = (typeof RSVP_DECLINE_STYLES)[number];
+
+/** Register and decline buttons. Links are the event's registration tags, so they work like the page's buttons. */
+export type RsvpProps = {
+  showDecline: boolean;
+  /** True opens the registration (or decline) form directly; false opens the event page. */
+  direct: boolean;
+  /** True gives each guest their own link (recognized, no login); false shares one link. */
+  personal: boolean;
+  align: Align;
+  /** Stretch the buttons to share the full width. */
+  fullWidth: boolean;
+  radius: number;
+  /** Null uses the event brand color. */
+  backgroundColor: string | null;
+  textColor: string | null;
+  declineStyle: RsvpDeclineStyle;
+  /** Null: an outline decline button is see-through; a solid one uses the register button's color. */
+  declineBackgroundColor: string | null;
+  /** Null: the register button's color for an outline button, its text color for a solid one. */
+  declineTextColor: string | null;
+};
+
+export type CalendarSource = 'event' | 'custom';
+
+/** Add-to-calendar buttons (Google, Outlook, .ics) for the event or a custom date. */
+export type CalendarProps = {
+  source: CalendarSource;
+  /** `calendar.custom:…` tag code when `source` is custom. */
+  customCode: string | null;
+  align: Align;
+  radius: number;
+  backgroundColor: string | null;
+  textColor: string | null;
+};
+
+/** The guest's personal ticket: QR code, optionally with the attributes shown on tickets. */
+export type TicketProps = {
+  showDetails: boolean;
+  /** QR code size in px. */
+  qrSize: number;
+  align: Align;
+  /** Null: no card behind the ticket. */
+  cardColor: string | null;
+  borderColor: string | null;
+  radius: number;
+};
+
+/** Date/time and place rows with icons. */
+export type EventInfoProps = {
+  align: Align;
+  color: string | null;
+  showIcons: boolean;
+  boxColor: string | null;
+  borderColor: string | null;
+  radius: number;
+};
+
+export const CALLOUT_VARIANTS = ['accent', 'outline', 'filled'] as const;
+export type CalloutVariant = (typeof CALLOUT_VARIANTS)[number];
+
+/** Rich text in a highlighted box. */
+export type CalloutProps = {
+  variant: CalloutVariant;
+  align: Align;
+  color: string | null;
+  /** Bar or border color. Null uses the event brand color. */
+  accentColor: string | null;
+  /** Null: a light gray for accent and filled boxes, none for outlined ones. */
+  boxColor: string | null;
+  radius: number;
+  size: TextSize;
+};
+
 export type BlockPropsByType = {
   heading: HeadingProps;
   text: TextProps;
@@ -114,11 +189,31 @@ export type BlockPropsByType = {
   columns: ColumnsProps;
   cover: CoverProps;
   classic: ClassicProps;
+  rsvp: RsvpProps;
+  calendar: CalendarProps;
+  ticket: TicketProps;
+  event_info: EventInfoProps;
+  callout: CalloutProps;
 };
 
 export type BlockType = keyof BlockPropsByType;
 
-export const BLOCK_TYPES = ['heading', 'text', 'button', 'image', 'divider', 'spacer', 'columns', 'cover', 'classic'] as const satisfies readonly BlockType[];
+export const BLOCK_TYPES = [
+  'heading',
+  'text',
+  'button',
+  'image',
+  'divider',
+  'spacer',
+  'columns',
+  'cover',
+  'classic',
+  'rsvp',
+  'calendar',
+  'ticket',
+  'event_info',
+  'callout',
+] as const satisfies readonly BlockType[];
 
 type BlockNodeOf<T extends BlockType> = {
   id: string;
@@ -141,6 +236,11 @@ export type SpacerBlock = BlockNodeByType['spacer'];
 export type ColumnsBlock = BlockNodeByType['columns'];
 export type CoverBlock = BlockNodeByType['cover'];
 export type ClassicBlock = BlockNodeByType['classic'];
+export type RsvpBlock = BlockNodeByType['rsvp'];
+export type CalendarBlock = BlockNodeByType['calendar'];
+export type TicketBlock = BlockNodeByType['ticket'];
+export type EventInfoBlock = BlockNodeByType['event_info'];
+export type CalloutBlock = BlockNodeByType['callout'];
 
 export type RootStyle = {
   /** Space above the first block, inside the card. */

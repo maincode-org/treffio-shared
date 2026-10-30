@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { normalizeColor } from './colors';
 import { sanitizeBackgroundImageUrl } from './html';
 import {
+  CALLOUT_VARIANTS,
   COLUMN_LAYOUTS,
+  RSVP_DECLINE_STYLES,
   type BlockDocument,
   type BlockNode,
   type BlockPropsByType,
@@ -112,7 +114,7 @@ export function resolveBlockPadding(block: BlockNode, document: Pick<BlockDocume
 }
 
 /** A translatable value of a block, stored in `event_text`. */
-export type TextField = 'html' | 'label' | 'href' | 'src' | 'alt';
+export type TextField = 'html' | 'label' | 'href' | 'src' | 'alt' | 'declineLabel' | 'when' | 'where';
 
 export type TextFieldKind = 'rich' | 'inline' | 'plain' | 'url';
 
@@ -181,6 +183,62 @@ const nullableIntIn = (min: number, max: number) =>
     .catch(null)
     .transform((value) => (value === null || !Number.isFinite(value) ? null : Math.round(Math.min(max, Math.max(min, value)))));
 const classicProps = (): BlockPropsByType['classic'] => ({ edgeToEdgeFirstImage: false });
+const rsvpProps = (): BlockPropsByType['rsvp'] => ({
+  showDecline: true,
+  direct: true,
+  personal: true,
+  align: 'left',
+  fullWidth: false,
+  radius: 6,
+  backgroundColor: null,
+  textColor: null,
+  declineStyle: 'outline',
+  declineBackgroundColor: null,
+  declineTextColor: null,
+});
+const calendarProps = (): BlockPropsByType['calendar'] => ({
+  source: 'event',
+  customCode: null,
+  align: 'center',
+  radius: 6,
+  backgroundColor: null,
+  textColor: null,
+});
+
+export const TICKET_QR_SIZE = { min: 120, max: 260, default: 180 } as const;
+
+const ticketProps = (): BlockPropsByType['ticket'] => ({
+  showDetails: true,
+  qrSize: TICKET_QR_SIZE.default,
+  align: 'center',
+  cardColor: null,
+  borderColor: null,
+  radius: 12,
+});
+const eventInfoProps = (): BlockPropsByType['event_info'] => ({
+  align: 'left',
+  color: null,
+  showIcons: true,
+  boxColor: null,
+  borderColor: null,
+  radius: 8,
+});
+const calloutProps = (): BlockPropsByType['callout'] => ({
+  variant: 'accent',
+  align: 'left',
+  color: null,
+  accentColor: null,
+  boxColor: null,
+  radius: 8,
+  size: 'normal',
+});
+
+const CUSTOM_CALENDAR_CODE_PATTERN = /^calendar\.custom:[A-Za-z0-9_-]{1,4000}$/;
+
+/** A `calendar.custom:…` tag code, or null when the value is not one. */
+export function sanitizeCalendarCode(value: unknown): string | null {
+  return typeof value === 'string' && CUSTOM_CALENDAR_CODE_PATTERN.test(value) ? value : null;
+}
 
 const withDefaults = <T extends object>(defaults: () => T, shape: z.ZodRawShape) =>
   z
@@ -338,6 +396,117 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       backgroundImage: null,
       fullWidth: false,
     }),
+  },
+  rsvp: {
+    type: 'rsvp',
+    label: 'RSVP buttons',
+    description: 'Register and decline buttons',
+    surfaces: ['email'],
+    insertable: true,
+    container: false,
+    textFields: [
+      { field: 'label', kind: 'plain', label: 'Register button text' },
+      { field: 'declineLabel', kind: 'plain', label: 'Decline button text' },
+    ],
+    propsSchema: withDefaults(rsvpProps, {
+      showDecline: z.boolean().catch(true),
+      direct: z.boolean().catch(true),
+      personal: z.boolean().catch(true),
+      align: alignSchema,
+      fullWidth: z.boolean().catch(false),
+      radius: intIn(0, 40, 6),
+      backgroundColor: colorSchema,
+      textColor: colorSchema,
+      declineStyle: z.enum(RSVP_DECLINE_STYLES).catch('outline'),
+      declineBackgroundColor: colorSchema,
+      declineTextColor: colorSchema,
+    }),
+    defaultProps: rsvpProps,
+    defaultStyle: () => padded(12),
+  },
+  calendar: {
+    type: 'calendar',
+    label: 'Calendar',
+    description: 'Add-to-calendar buttons',
+    surfaces: ['email'],
+    insertable: true,
+    container: false,
+    textFields: [],
+    propsSchema: withDefaults(calendarProps, {
+      source: z.enum(['event', 'custom']).catch('event'),
+      customCode: z
+        .string()
+        .nullable()
+        .catch(null)
+        .transform((value) => sanitizeCalendarCode(value)),
+      align: z.enum(['left', 'center', 'right']).catch('center'),
+      radius: intIn(0, 40, 6),
+      backgroundColor: colorSchema,
+      textColor: colorSchema,
+    }),
+    defaultProps: calendarProps,
+    defaultStyle: () => padded(12),
+  },
+  ticket: {
+    type: 'ticket',
+    label: 'Ticket',
+    description: "The guest's QR ticket",
+    surfaces: ['email'],
+    insertable: true,
+    container: false,
+    textFields: [],
+    propsSchema: withDefaults(ticketProps, {
+      showDetails: z.boolean().catch(true),
+      qrSize: intIn(TICKET_QR_SIZE.min, TICKET_QR_SIZE.max, TICKET_QR_SIZE.default),
+      align: z.enum(['left', 'center', 'right']).catch('center'),
+      cardColor: colorSchema,
+      borderColor: colorSchema,
+      radius: intIn(0, 40, 12),
+    }),
+    defaultProps: ticketProps,
+    defaultStyle: () => padded(12),
+  },
+  event_info: {
+    type: 'event_info',
+    label: 'When & where',
+    description: 'Date, time and place',
+    surfaces: ['email'],
+    insertable: true,
+    container: false,
+    textFields: [
+      { field: 'when', kind: 'plain', label: 'When' },
+      { field: 'where', kind: 'plain', label: 'Where' },
+    ],
+    propsSchema: withDefaults(eventInfoProps, {
+      align: alignSchema,
+      color: colorSchema,
+      showIcons: z.boolean().catch(true),
+      boxColor: colorSchema,
+      borderColor: colorSchema,
+      radius: intIn(0, 40, 8),
+    }),
+    defaultProps: eventInfoProps,
+    defaultStyle: () => padded(8),
+  },
+  callout: {
+    type: 'callout',
+    label: 'Callout',
+    description: 'Important info in a highlighted box',
+    surfaces: ['email'],
+    insertable: true,
+    container: false,
+    textFields: [{ field: 'html', kind: 'rich', label: 'Text' }],
+    propsSchema: withDefaults(calloutProps, {
+      variant: z.enum(CALLOUT_VARIANTS).catch('accent'),
+      align: alignSchema,
+      color: colorSchema,
+      accentColor: colorSchema,
+      boxColor: colorSchema,
+      radius: intIn(0, 40, 8),
+      size: textSizeSchema,
+    }),
+    defaultProps: calloutProps,
+    defaultStyle: () => padded(8),
   },
 };
 

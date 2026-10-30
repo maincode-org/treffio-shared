@@ -1,7 +1,21 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
-import { blockCardEdges, clampEmailBodyTextSize, columnWidths, EMAIL_BODY_TEXT_SIZE, headingFontSize, imageCornerRadii, resolveBlockPadding, type TextField } from '../registry';
-import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, CoverBlock, Padding } from '../types';
+import { RSVP_DEFAULT_LABELS, rsvpLinkCode, ticketTagRaw } from '../event-blocks';
+import {
+  blockCardEdges,
+  clampEmailBodyTextSize,
+  columnWidths,
+  EMAIL_BODY_TEXT_SIZE,
+  headingFontSize,
+  imageCornerRadii,
+  resolveBlockPadding,
+  sanitizeCalendarCode,
+  type TextField,
+} from '../registry';
+import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, CoverBlock, Padding, RsvpBlock } from '../types';
+
+/** Box behind accent and filled callouts when no color is chosen. */
+export const CALLOUT_DEFAULT_BOX = '#f4f6f8';
 
 /** Resolved shell colors and fonts. Colors are hex or rgba(); `fontFamily` must not contain double quotes. */
 export type EmailShellTheme = {
@@ -35,6 +49,10 @@ export type EmailSlot =
   | { id: string; kind: 'rich'; blockId: string; raw: string; textColor: string }
   | { id: string; kind: 'classic'; blockId: string; raw: string; padding: Padding; edgeToEdgeFirstImage: boolean }
   | { id: string; kind: 'button'; blockId: string; raw: string; anchorStyle: string }
+  /** Calendar buttons from a calendar tag: the server restyles each link and aligns the row. */
+  | { id: string; kind: 'calendar'; blockId: string; raw: string; anchorStyle: string; align: Align }
+  /** The personal ticket tag. Without a recipient (preview) the server draws a placeholder of `qrSize`. */
+  | { id: string; kind: 'ticket'; blockId: string; raw: string; qrSize: number }
   | { id: string; kind: 'preheader' }
   | { id: string; kind: 'footer' };
 
@@ -88,24 +106,109 @@ function themeBodySize(theme: EmailShellTheme, size: 'normal' | 'small'): number
 const paddingAttr = (padding: Padding) => `${px(padding.top)} ${px(padding.right)} ${px(padding.bottom)} ${px(padding.left)}`;
 const attr = (value: string) => escapeAttribute(value);
 
-function anchorStyleFor(block: ButtonBlock, theme: EmailShellTheme): { background: string; style: string } {
-  const background = block.props.backgroundColor ?? theme.buttonBackground;
-  const text = block.props.textColor ?? theme.buttonText;
-  const display = block.props.fullWidth ? 'block' : 'inline-block';
-  const style = [
-    `display: ${display}`,
-    'padding: 12px 24px',
-    `font-family: ${theme.fontFamily}`,
+type AnchorLook = { background: string | null; text: string; radius: number; block: boolean; fontFamily: string; border?: number; extra?: string };
+
+/** Inline style of a button link. A border is drawn inside the padding so outlined and solid buttons match in height. */
+function buttonAnchorStyle(look: AnchorLook): string {
+  const border = look.border ?? 0;
+  return [
+    `display: ${look.block ? 'block' : 'inline-block'}`,
+    `padding: ${12 - border}px ${24 - border}px`,
+    `font-family: ${look.fontFamily}`,
     'font-size: 15px',
     'font-weight: 600',
     'line-height: 1.2',
-    `color: ${text} !important`,
+    `color: ${look.text} !important`,
     'text-decoration: none !important',
-    `border-radius: ${block.props.radius}px`,
-    `background-color: ${background}`,
+    `border-radius: ${look.radius}px`,
+    look.background ? `background-color: ${look.background}` : 'background-color: transparent',
+    border > 0 ? `border: ${border}px solid ${look.text}` : '',
     'mso-padding-alt: 0',
-  ].join('; ');
+    look.extra ?? '',
+  ]
+    .filter(Boolean)
+    .join('; ');
+}
+
+function anchorStyleFor(block: ButtonBlock, theme: EmailShellTheme): { background: string; style: string } {
+  const background = block.props.backgroundColor ?? theme.buttonBackground;
+  const text = block.props.textColor ?? theme.buttonText;
+  const style = buttonAnchorStyle({ background, text, radius: block.props.radius, block: block.props.fullWidth, fontFamily: theme.fontFamily });
   return { background, style };
+}
+
+/** Plain text (with tags) as HTML: escaped, line breaks kept. */
+function plainTextHtml(value: string): string {
+  return escapeHtml(value).replace(/\r?\n/g, '<br>');
+}
+
+/** One table cell holding a button slot, with the background on the cell for Outlook. */
+function buttonCell(token: string, background: string | null, radius: number, width: string): string {
+  const bgcolor = background ? ` bgcolor="${attr(opaqueColor(background, '#333333'))}"` : '';
+  const fill = background ? ` background-color: ${attr(background)};` : '';
+  return `<td align="center"${bgcolor}${width ? ` width="${width}"` : ''} style="border-radius: ${radius}px;${fill}">${token}</td>`;
+}
+
+function renderRsvp(block: RsvpBlock, ctx: RenderContext, padding: Padding, bg: string): string {
+  const { input, theme } = ctx;
+  const { props } = block;
+  const registerBackground = props.backgroundColor ?? theme.buttonBackground;
+  const registerText = props.textColor ?? theme.buttonText;
+  const registerLabel = input.readText(block, 'label').trim() || RSVP_DEFAULT_LABELS.register.en;
+  const registerId = `${block.id}__register`;
+  ctx.slots.push({
+    id: registerId,
+    kind: 'button',
+    blockId: block.id,
+    raw: buttonRawHtml(registerLabel, `{{${rsvpLinkCode(props, 'register')}}}`),
+    anchorStyle: buttonAnchorStyle({ background: registerBackground, text: registerText, radius: props.radius, block: props.fullWidth, fontFamily: theme.fontFamily }),
+  });
+
+  const cellWidth = props.fullWidth && props.showDecline ? '50%' : '';
+  const cells = [buttonCell(emailSlotToken(registerId), registerBackground, props.radius, cellWidth)];
+
+  if (props.showDecline) {
+    const solid = props.declineStyle === 'solid';
+    const declineBackground = solid ? (props.declineBackgroundColor ?? registerBackground) : props.declineBackgroundColor;
+    const declineText = props.declineTextColor ?? (solid ? registerText : registerBackground);
+    const declineLabel = input.readText(block, 'declineLabel').trim() || RSVP_DEFAULT_LABELS.decline.en;
+    const declineId = `${block.id}__decline`;
+    ctx.slots.push({
+      id: declineId,
+      kind: 'button',
+      blockId: block.id,
+      raw: buttonRawHtml(declineLabel, `{{${rsvpLinkCode(props, 'decline')}}}`),
+      anchorStyle: buttonAnchorStyle({
+        background: declineBackground,
+        text: declineText,
+        radius: props.radius,
+        block: props.fullWidth,
+        fontFamily: theme.fontFamily,
+        border: solid ? 0 : 2,
+      }),
+    });
+    cells.push('<td width="12" style="width: 12px; font-size: 0; line-height: 0;">&nbsp;</td>');
+    cells.push(buttonCell(emailSlotToken(declineId), declineBackground, props.radius, cellWidth));
+  }
+
+  const tableStyle = `border-collapse: separate;${props.fullWidth ? ' width: 100%;' : ''}`;
+  const table = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${props.align}" style="${tableStyle}"><tr>${cells.join('')}</tr></table>`;
+  return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(props.align)}"${bg}>${table}</mj-text>`;
+}
+
+/** A box around other content: background, border and radius on one table cell. */
+function boxTable(inner: string, box: { color: string | null; border: string; radius: number; padding: string; align: Align }): string {
+  const bgcolor = box.color ? ` bgcolor="${attr(opaqueColor(box.color, '#ffffff'))}"` : '';
+  const style = [
+    `padding: ${box.padding}`,
+    box.color ? `background-color: ${attr(box.color)}` : '',
+    box.border,
+    box.radius > 0 ? `border-radius: ${box.radius}px` : '',
+    `text-align: ${box.align}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: separate;"><tr><td${bgcolor} style="${style}">${inner}</td></tr></table>`;
 }
 
 /**
@@ -238,6 +341,84 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
     }
     case 'spacer':
       return `<mj-spacer height="${block.props.height}px" padding="0"${bg} />`;
+    case 'rsvp':
+      return renderRsvp(block, ctx, padding, bg);
+    case 'calendar': {
+      const code = block.props.source === 'custom' ? sanitizeCalendarCode(block.props.customCode) : 'event.add_to_calendar';
+      if (!code) return '';
+      const anchorStyle = buttonAnchorStyle({
+        background: block.props.backgroundColor ?? theme.buttonBackground,
+        text: block.props.textColor ?? theme.buttonText,
+        radius: block.props.radius,
+        block: false,
+        fontFamily: theme.fontFamily,
+        extra: 'margin: 4px',
+      });
+      ctx.slots.push({ id: block.id, kind: 'calendar', blockId: block.id, raw: `{{${code}}}`, anchorStyle, align: block.props.align });
+      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(block.props.align)}"${bg}>${emailSlotToken(block.id)}</mj-text>`;
+    }
+    case 'ticket': {
+      const { props } = block;
+      ctx.slots.push({ id: block.id, kind: 'ticket', blockId: block.id, raw: ticketTagRaw(props), qrSize: props.qrSize });
+      const card = !!props.cardColor || !!props.borderColor;
+      const style = [
+        'border-collapse: separate',
+        props.cardColor ? `background-color: ${attr(props.cardColor)}` : '',
+        props.borderColor ? `border: 1px solid ${attr(props.borderColor)}` : '',
+        card && props.radius > 0 ? `border-radius: ${props.radius}px` : '',
+      ]
+        .filter(Boolean)
+        .join('; ');
+      const bgcolor = props.cardColor ? ` bgcolor="${attr(opaqueColor(props.cardColor, '#ffffff'))}"` : '';
+      const ticket = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${props.align}"${bgcolor} style="${style}"><tr><td align="center" style="padding: ${card ? 20 : 0}px;">${emailSlotToken(block.id)}</td></tr></table>`;
+      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(props.align)}"${bg}>${ticket}</mj-text>`;
+    }
+    case 'event_info': {
+      const { props } = block;
+      const color = props.color ?? theme.textColor;
+      const rows = (
+        [
+          ['when', '&#128197;'],
+          ['where', '&#128205;'],
+        ] as const
+      )
+        .map(([field, icon]) => {
+          const value = input.readText(block, field).trim();
+          if (!value) return '';
+          const id = `${block.id}__${field}`;
+          ctx.slots.push({ id, kind: 'rich', blockId: block.id, raw: plainTextHtml(value), textColor: color });
+          const iconCell = props.showIcons ? `<td width="28" valign="top" style="width: 28px; font-size: 16px; line-height: 1.4;">${icon}</td>` : '';
+          return `<tr>${iconCell}<td valign="top" style="padding: 2px 0; text-align: ${props.align};">${emailSlotToken(id)}</td></tr>`;
+        })
+        .filter(Boolean);
+      if (rows.length === 0) return '';
+      const list = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join('')}</table>`;
+      const boxed = !!props.boxColor || !!props.borderColor;
+      const inner = boxed
+        ? boxTable(list, {
+            color: props.boxColor,
+            border: props.borderColor ? `border: 1px solid ${attr(props.borderColor)}` : '',
+            radius: props.radius,
+            padding: '14px 18px',
+            align: props.align,
+          })
+        : list;
+      const fontSize = themeBodySize(theme, 'normal');
+      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(props.align)}" color="${attr(color)}" font-size="${fontSize}px" line-height="1.4"${bg}>${inner}</mj-text>`;
+    }
+    case 'callout': {
+      const raw = input.readText(block, 'html');
+      if (!raw.trim()) return '';
+      const { props } = block;
+      const color = props.color ?? theme.textColor;
+      const accent = props.accentColor ?? theme.buttonBackground;
+      const boxColor = props.boxColor ?? (props.variant === 'outline' ? null : CALLOUT_DEFAULT_BOX);
+      const border = props.variant === 'accent' ? `border-left: 4px solid ${attr(accent)}` : props.variant === 'outline' ? `border: 1px solid ${attr(accent)}` : '';
+      const fontSize = themeBodySize(theme, props.size);
+      ctx.slots.push({ id: block.id, kind: 'rich', blockId: block.id, raw, textColor: color });
+      const inner = boxTable(emailSlotToken(block.id), { color: boxColor, border, radius: props.radius, padding: '16px 20px', align: props.align });
+      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(props.align)}" color="${attr(color)}" font-size="${fontSize}px" line-height="1.4"${bg}>${inner}</mj-text>`;
+    }
     case 'columns':
     case 'cover':
       return '';
