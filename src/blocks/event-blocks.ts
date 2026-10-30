@@ -1,4 +1,4 @@
-import type { Locale, RsvpProps, TicketProps } from './types';
+import type { EventInfoProps, EventInfoSource, Locale, RsvpProps, TicketProps } from './types';
 
 export type RsvpButton = 'register' | 'decline';
 
@@ -27,6 +27,19 @@ export const RSVP_DEFAULT_LABELS: Record<RsvpButton, Record<Locale, string>> = {
 /** Personal ticket tag with the block's options as parameters (`size`, `details`). */
 export function ticketTagRaw(props: Pick<TicketProps, 'qrSize' | 'showDetails'>): string {
   return `{{guest.personal_ticket;;size=${props.qrSize}&details=${props.showDetails ? 1 : 0}}}`;
+}
+
+export type EventInfoRow = 'when' | 'where';
+
+/** Tags that fill When & where rows set to the event's own value. */
+export const EVENT_INFO_TAG_CODES: Record<EventInfoRow, string> = {
+  when: 'event.start_date',
+  where: 'event.address',
+};
+
+/** The source prop of each When & where row. */
+export function eventInfoSource(props: Pick<EventInfoProps, 'whenSource' | 'whereSource'>, row: EventInfoRow): EventInfoSource {
+  return row === 'when' ? props.whenSource : props.whereSource;
 }
 
 /** Labels of the three calendar buttons, as the server renders them. */

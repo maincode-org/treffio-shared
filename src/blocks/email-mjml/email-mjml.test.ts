@@ -264,8 +264,20 @@ describe('event blocks', () => {
     expect(calloutOutput.mjml).toContain('border: 1px solid');
 
     const info = single('event_info');
-    const infoOutput = build(info.document, { [`${OWNER}.block.${info.block.id}.when`]: { da: '{{event.start_date}}' } });
-    expect(infoOutput.slots.filter((slot) => slot.kind === 'rich').map((slot) => slot.id)).toEqual([`${info.block.id}__when`]);
+    const infoOutput = build(info.document, {});
+    expect(infoOutput.slots.filter((slot) => slot.kind === 'rich').map((slot) => slot.kind === 'rich' && slot.raw)).toEqual([
+      '{{event.start_date}}',
+      '{{event.address}}',
+    ]);
+
+    const custom = single('event_info', { whenSource: 'custom', whereSource: 'hidden' });
+    const customOutput = build(custom.document, { [`${OWNER}.block.${custom.block.id}.when`]: { da: 'Fredag <kl. 19>' } });
+    expect(customOutput.slots.filter((slot) => slot.kind === 'rich').map((slot) => slot.kind === 'rich' && slot.raw)).toEqual(['Fredag &lt;kl. 19&gt;']);
+  });
+
+  it('defaults callouts to the filled style', () => {
+    const fresh = createBlock('callout', 'email');
+    expect(fresh.type === 'callout' && fresh.props.variant).toBe('filled');
   });
 });
 

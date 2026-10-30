@@ -153,8 +153,14 @@ export type TicketProps = {
   radius: number;
 };
 
+/** Where a When & where row comes from: the event's own value, typed text, or nothing. */
+export const EVENT_INFO_SOURCES = ['event', 'custom', 'hidden'] as const;
+export type EventInfoSource = (typeof EVENT_INFO_SOURCES)[number];
+
 /** Date/time and place rows with icons. */
 export type EventInfoProps = {
+  whenSource: EventInfoSource;
+  whereSource: EventInfoSource;
   align: Align;
   color: string | null;
   showIcons: boolean;
@@ -163,7 +169,7 @@ export type EventInfoProps = {
   radius: number;
 };
 
-export const CALLOUT_VARIANTS = ['accent', 'outline', 'filled'] as const;
+export const CALLOUT_VARIANTS = ['filled', 'accent', 'outline'] as const;
 export type CalloutVariant = (typeof CALLOUT_VARIANTS)[number];
 
 /** Rich text in a highlighted box. */

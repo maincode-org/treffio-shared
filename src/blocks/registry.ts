@@ -4,6 +4,7 @@ import { sanitizeBackgroundImageUrl } from './html';
 import {
   CALLOUT_VARIANTS,
   COLUMN_LAYOUTS,
+  EVENT_INFO_SOURCES,
   RSVP_DECLINE_STYLES,
   type BlockDocument,
   type BlockNode,
@@ -216,6 +217,8 @@ const ticketProps = (): BlockPropsByType['ticket'] => ({
   radius: 12,
 });
 const eventInfoProps = (): BlockPropsByType['event_info'] => ({
+  whenSource: 'event',
+  whereSource: 'event',
   align: 'left',
   color: null,
   showIcons: true,
@@ -224,7 +227,7 @@ const eventInfoProps = (): BlockPropsByType['event_info'] => ({
   radius: 8,
 });
 const calloutProps = (): BlockPropsByType['callout'] => ({
-  variant: 'accent',
+  variant: 'filled',
   align: 'left',
   color: null,
   accentColor: null,
@@ -478,6 +481,8 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
       { field: 'where', kind: 'plain', label: 'Where' },
     ],
     propsSchema: withDefaults(eventInfoProps, {
+      whenSource: z.enum(EVENT_INFO_SOURCES).catch('event'),
+      whereSource: z.enum(EVENT_INFO_SOURCES).catch('event'),
       align: alignSchema,
       color: colorSchema,
       showIcons: z.boolean().catch(true),
@@ -497,7 +502,7 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     container: false,
     textFields: [{ field: 'html', kind: 'rich', label: 'Text' }],
     propsSchema: withDefaults(calloutProps, {
-      variant: z.enum(CALLOUT_VARIANTS).catch('accent'),
+      variant: z.enum(CALLOUT_VARIANTS).catch('filled'),
       align: alignSchema,
       color: colorSchema,
       accentColor: colorSchema,

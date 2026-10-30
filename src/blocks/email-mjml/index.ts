@@ -1,6 +1,6 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
-import { RSVP_DEFAULT_LABELS, rsvpLinkCode, ticketTagRaw } from '../event-blocks';
+import { EVENT_INFO_TAG_CODES, eventInfoSource, RSVP_DEFAULT_LABELS, rsvpLinkCode, ticketTagRaw } from '../event-blocks';
 import {
   blockCardEdges,
   clampEmailBodyTextSize,
@@ -385,10 +385,12 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
         ] as const
       )
         .map(([field, icon]) => {
-          const value = input.readText(block, field).trim();
-          if (!value) return '';
+          const source = eventInfoSource(props, field);
+          const custom = source === 'custom' ? input.readText(block, field).trim() : '';
+          if (source === 'hidden' || (source === 'custom' && !custom)) return '';
+          const raw = source === 'event' ? `{{${EVENT_INFO_TAG_CODES[field]}}}` : plainTextHtml(custom);
           const id = `${block.id}__${field}`;
-          ctx.slots.push({ id, kind: 'rich', blockId: block.id, raw: plainTextHtml(value), textColor: color });
+          ctx.slots.push({ id, kind: 'rich', blockId: block.id, raw, textColor: color });
           const iconCell = props.showIcons ? `<td width="28" valign="top" style="width: 28px; font-size: 16px; line-height: 1.4;">${icon}</td>` : '';
           return `<tr>${iconCell}<td valign="top" style="padding: 2px 0; text-align: ${props.align};">${emailSlotToken(id)}</td></tr>`;
         })

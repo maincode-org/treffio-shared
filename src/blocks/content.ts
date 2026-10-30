@@ -1,3 +1,4 @@
+import { eventInfoSource } from './event-blocks';
 import { isBlankHtml, stripHtml } from './html';
 import { textKeyForBlock } from './keys';
 import { BLOCK_DEFINITIONS, sanitizeCalendarCode, type TextField } from './registry';
@@ -29,7 +30,10 @@ export function blockHasContent(block: BlockNode, options: ReadOptions): boolean
     case 'calendar':
       return block.props.source === 'event' || !!sanitizeCalendarCode(block.props.customCode);
     case 'event_info':
-      return read(block, 'when', options).trim().length > 0 || read(block, 'where', options).trim().length > 0;
+      return (['when', 'where'] as const).some((row) => {
+        const source = eventInfoSource(block.props, row);
+        return source === 'event' || (source === 'custom' && read(block, row, options).trim().length > 0);
+      });
     default:
       return false;
   }
@@ -56,7 +60,10 @@ export function documentPlainText(document: BlockDocument, options: ReadOptions)
       const label = read(block, 'label', options).trim();
       if (label) parts.push(label);
     } else if (block.type === 'event_info') {
-      const rows = [read(block, 'when', options).trim(), read(block, 'where', options).trim()].filter(Boolean);
+      const rows = (['when', 'where'] as const)
+        .filter((row) => eventInfoSource(block.props, row) === 'custom')
+        .map((row) => read(block, row, options).trim())
+        .filter(Boolean);
       if (rows.length > 0) parts.push(rows.join('\n'));
     }
   }
