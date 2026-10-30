@@ -187,7 +187,7 @@ const rsvpProps = (): BlockPropsByType['rsvp'] => ({
   showDecline: true,
   direct: true,
   personal: true,
-  align: 'left',
+  align: 'center',
   fullWidth: false,
   radius: 6,
   backgroundColor: null,

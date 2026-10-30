@@ -52,7 +52,7 @@ export type EmailSlot =
   /** Calendar buttons from a calendar tag: the server restyles each link and aligns the row. */
   | { id: string; kind: 'calendar'; blockId: string; raw: string; anchorStyle: string; align: Align }
   /** The personal ticket tag. Without a recipient (preview) the server draws a placeholder of `qrSize`. */
-  | { id: string; kind: 'ticket'; blockId: string; raw: string; qrSize: number }
+  | { id: string; kind: 'ticket'; blockId: string; raw: string; qrSize: number; showDetails: boolean }
   | { id: string; kind: 'preheader' }
   | { id: string; kind: 'footer' };
 
@@ -165,7 +165,8 @@ function renderRsvp(block: RsvpBlock, ctx: RenderContext, padding: Padding, bg: 
   });
 
   const cellWidth = props.fullWidth && props.showDecline ? '50%' : '';
-  const cells = [buttonCell(emailSlotToken(registerId), registerBackground, props.radius, cellWidth)];
+  const registerCell = buttonCell(emailSlotToken(registerId), registerBackground, props.radius, cellWidth);
+  const cells: string[] = [];
 
   if (props.showDecline) {
     const solid = props.declineStyle === 'solid';
@@ -187,9 +188,10 @@ function renderRsvp(block: RsvpBlock, ctx: RenderContext, padding: Padding, bg: 
         border: solid ? 0 : 2,
       }),
     });
-    cells.push('<td width="12" style="width: 12px; font-size: 0; line-height: 0;">&nbsp;</td>');
     cells.push(buttonCell(emailSlotToken(declineId), declineBackground, props.radius, cellWidth));
+    cells.push('<td width="12" style="width: 12px; font-size: 0; line-height: 0;">&nbsp;</td>');
   }
+  cells.push(registerCell);
 
   const tableStyle = `border-collapse: separate;${props.fullWidth ? ' width: 100%;' : ''}`;
   const table = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${props.align}" style="${tableStyle}"><tr>${cells.join('')}</tr></table>`;
@@ -359,7 +361,7 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
     }
     case 'ticket': {
       const { props } = block;
-      ctx.slots.push({ id: block.id, kind: 'ticket', blockId: block.id, raw: ticketTagRaw(props), qrSize: props.qrSize });
+      ctx.slots.push({ id: block.id, kind: 'ticket', blockId: block.id, raw: ticketTagRaw(props), qrSize: props.qrSize, showDetails: props.showDetails });
       const card = !!props.cardColor || !!props.borderColor;
       const style = [
         'border-collapse: separate',

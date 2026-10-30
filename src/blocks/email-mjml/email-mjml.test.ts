@@ -230,6 +230,14 @@ describe('event blocks', () => {
     expect(buttons).toEqual(['{{guest.registration_form_url;Tilmeld}}', '{{guest.decline_form_url;I won&#39;t attend}}']);
   });
 
+  it('puts the decline button before the register button, centered by default', () => {
+    const { block, document } = single('rsvp');
+    const { mjml } = build(document, {});
+    expect(mjml.indexOf(emailSlotToken(`${block.id}__decline`))).toBeLessThan(mjml.indexOf(emailSlotToken(`${block.id}__register`)));
+    const fresh = createBlock('rsvp', 'email');
+    expect(fresh.type === 'rsvp' && fresh.props.align).toBe('center');
+  });
+
   it('leaves the decline button out and uses shared page links when asked', () => {
     const { document } = single('rsvp', { showDecline: false, personal: false, direct: false });
     const buttons = build(document, {}).slots.filter((slot) => slot.kind === 'button');
