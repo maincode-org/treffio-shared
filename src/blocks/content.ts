@@ -1,4 +1,5 @@
 import { eventInfoSource } from './event-blocks';
+import { FILES_DEFAULT_LABELS, sanitizeShareId } from './files';
 import { isBlankHtml, stripHtml } from './html';
 import { textKeyForBlock } from './keys';
 import { BLOCK_DEFINITIONS, sanitizeCalendarCode, type TextField } from './registry';
@@ -29,6 +30,8 @@ export function blockHasContent(block: BlockNode, options: ReadOptions): boolean
       return true;
     case 'calendar':
       return block.props.source === 'event' || !!sanitizeCalendarCode(block.props.customCode);
+    case 'files':
+      return !!sanitizeShareId(block.props.shareId);
     case 'event_info':
       return (['when', 'where'] as const).some((row) => {
         const source = eventInfoSource(block.props, row);
@@ -59,6 +62,8 @@ export function documentPlainText(document: BlockDocument, options: ReadOptions)
     } else if (block.type === 'button') {
       const label = read(block, 'label', options).trim();
       if (label) parts.push(label);
+    } else if (block.type === 'files' && sanitizeShareId(block.props.shareId)) {
+      parts.push(read(block, 'label', options).trim() || FILES_DEFAULT_LABELS[options.lang]);
     } else if (block.type === 'event_info') {
       const rows = (['when', 'where'] as const)
         .filter((row) => eventInfoSource(block.props, row) === 'custom')

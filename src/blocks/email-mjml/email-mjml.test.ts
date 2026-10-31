@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createBlock, createEmptyDocument, createLegacyDocument, insertBlock, readBlockText, type BlockDocument, type TextMap } from '../index';
+import { createBlock, createEmptyDocument, createLegacyDocument, insertBlock, isBlockedFileName, parseBlockProps, readBlockText, type BlockDocument, type TextMap } from '../index';
 import { buildEmailMjml, buttonRawHtml, emailSlotToken, fillEmailSlots, styleButtonHtml, type EmailShellTheme } from './index';
 
 const OWNER = 'email.invitation';
@@ -278,6 +278,37 @@ describe('event blocks', () => {
   it('defaults callouts to the filled style', () => {
     const fresh = createBlock('callout', 'email');
     expect(fresh.type === 'callout' && fresh.props.variant).toBe('filled');
+  });
+
+  it('links a files button to its download page, and renders nothing before files are attached', () => {
+    const shareId = '3f1c2b7a-9d4e-4c1b-8a2f-5e6d7c8b9a01';
+    const { block, document } = single('files', { shareId });
+    const output = build(document, { [`${OWNER}.block.${block.id}.label`]: { da: 'Hent programmet' } });
+    expect(output.slots.find((slot) => slot.id === block.id)).toMatchObject({ kind: 'button', raw: `{{event.files_url;Hent programmet;id=${shareId}}}` });
+    expect(output.mjml).toContain('align="center"');
+
+    const fallback = build(document, {}).slots.find((slot) => slot.id === block.id);
+    expect(fallback?.kind === 'button' && fallback.raw).toBe(`{{event.files_url;Download files;id=${shareId}}}`);
+
+    const empty = single('files');
+    expect(build(empty.document, {}).slots.some((slot) => slot.id === empty.block.id)).toBe(false);
+  });
+
+  it('drops a files share id that is not a uuid', () => {
+    expect(parseBlockProps('files', { shareId: 'x}}{{guest.email' }).shareId).toBe(null);
+    const { block, document } = single('files', { shareId: 'x}}{{guest.email' });
+    expect(build(document, {}).slots.some((slot) => slot.id === block.id)).toBe(false);
+  });
+});
+
+describe('file names', () => {
+  it('refuses programs and web pages, allows documents and media', () => {
+    expect(isBlockedFileName('setup.EXE')).toBe(true);
+    expect(isBlockedFileName('page.html')).toBe(true);
+    expect(isBlockedFileName('program.pdf')).toBe(false);
+    expect(isBlockedFileName('budget.xlsx')).toBe(false);
+    expect(isBlockedFileName('aftermovie.mp4')).toBe(false);
+    expect(isBlockedFileName('README')).toBe(false);
   });
 });
 

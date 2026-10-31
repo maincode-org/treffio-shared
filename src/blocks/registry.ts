@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizeColor } from './colors';
+import { sanitizeShareId } from './files';
 import { sanitizeBackgroundImageUrl } from './html';
 import { imageEditStateSchema } from './image-edits';
 import {
@@ -242,6 +243,14 @@ const calloutProps = (): BlockPropsByType['callout'] => ({
   boxColor: null,
   radius: 8,
   size: 'normal',
+});
+const filesProps = (): BlockPropsByType['files'] => ({
+  shareId: null,
+  align: 'center',
+  fullWidth: false,
+  radius: 6,
+  backgroundColor: null,
+  textColor: null,
 });
 
 const CUSTOM_CALENDAR_CODE_PATTERN = /^calendar\.custom:[A-Za-z0-9_-]{1,4000}$/;
@@ -522,6 +531,28 @@ export const BLOCK_DEFINITIONS: { [T in BlockType]: BlockDefinition<T> } = {
     }),
     defaultProps: calloutProps,
     defaultStyle: () => padded(8),
+  },
+  files: {
+    type: 'files',
+    label: 'Files',
+    description: 'A button to download attached files',
+    surfaces: ['email', 'in_app', 'page'],
+    insertable: true,
+    container: false,
+    textFields: [{ field: 'label', kind: 'plain', label: 'Button text' }],
+    propsSchema: withDefaults(filesProps, {
+      shareId: z
+        .unknown()
+        .transform((value) => sanitizeShareId(value))
+        .catch(null),
+      align: z.enum(['left', 'center', 'right']).catch('center'),
+      fullWidth: z.boolean().catch(false),
+      radius: intIn(0, 40, 6),
+      backgroundColor: colorSchema,
+      textColor: colorSchema,
+    }),
+    defaultProps: filesProps,
+    defaultStyle: () => padded(12),
   },
 };
 

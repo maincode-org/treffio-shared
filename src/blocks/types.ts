@@ -191,6 +191,18 @@ export type CalloutProps = {
   size: TextSize;
 };
 
+/** A button that opens a download page for attached files (`event_file_share`). */
+export type FilesProps = {
+  /** The download link. Null until the first file is attached; the block renders nothing then. */
+  shareId: string | null;
+  align: Align;
+  fullWidth: boolean;
+  radius: number;
+  /** Null uses the event brand color. */
+  backgroundColor: string | null;
+  textColor: string | null;
+};
+
 export type BlockPropsByType = {
   heading: HeadingProps;
   text: TextProps;
@@ -206,6 +218,7 @@ export type BlockPropsByType = {
   ticket: TicketProps;
   event_info: EventInfoProps;
   callout: CalloutProps;
+  files: FilesProps;
 };
 
 export type BlockType = keyof BlockPropsByType;
@@ -225,6 +238,7 @@ export const BLOCK_TYPES = [
   'ticket',
   'event_info',
   'callout',
+  'files',
 ] as const satisfies readonly BlockType[];
 
 type BlockNodeOf<T extends BlockType> = {
@@ -253,6 +267,7 @@ export type CalendarBlock = BlockNodeByType['calendar'];
 export type TicketBlock = BlockNodeByType['ticket'];
 export type EventInfoBlock = BlockNodeByType['event_info'];
 export type CalloutBlock = BlockNodeByType['callout'];
+export type FilesBlock = BlockNodeByType['files'];
 
 export type RootStyle = {
   /** Space above the first block, inside the card. */

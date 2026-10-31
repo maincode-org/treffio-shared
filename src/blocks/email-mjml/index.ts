@@ -1,6 +1,7 @@
 import { opaqueColor } from '../colors';
 import { escapeAttribute, escapeHtml, parseTagOnlyValue, sanitizeBackgroundImageUrl, sanitizeUrl, toTagSafeText } from '../html';
 import { EVENT_INFO_TAG_CODES, eventInfoSource, RSVP_DEFAULT_LABELS, rsvpLinkCode, ticketTagRaw } from '../event-blocks';
+import { FILES_DEFAULT_LABELS, filesLinkTagRaw, sanitizeShareId } from '../files';
 import {
   blockCardEdges,
   clampEmailBodyTextSize,
@@ -12,7 +13,7 @@ import {
   sanitizeCalendarCode,
   type TextField,
 } from '../registry';
-import type { Align, BlockDocument, BlockNode, ButtonBlock, ColumnsBlock, CoverBlock, Padding, RsvpBlock } from '../types';
+import type { Align, BlockDocument, BlockNode, ButtonProps, ColumnsBlock, CoverBlock, Padding, RsvpBlock } from '../types';
 
 /** Box behind accent and filled callouts when no color is chosen. */
 export const CALLOUT_DEFAULT_BOX = '#f4f6f8';
@@ -130,11 +131,22 @@ function buttonAnchorStyle(look: AnchorLook): string {
     .join('; ');
 }
 
-function anchorStyleFor(block: ButtonBlock, theme: EmailShellTheme): { background: string; style: string } {
-  const background = block.props.backgroundColor ?? theme.buttonBackground;
-  const text = block.props.textColor ?? theme.buttonText;
-  const style = buttonAnchorStyle({ background, text, radius: block.props.radius, block: block.props.fullWidth, fontFamily: theme.fontFamily });
+type ButtonLook = Pick<ButtonProps, 'align' | 'fullWidth' | 'backgroundColor' | 'textColor' | 'radius'>;
+
+function anchorStyleFor(props: ButtonLook, theme: EmailShellTheme): { background: string; style: string } {
+  const background = props.backgroundColor ?? theme.buttonBackground;
+  const text = props.textColor ?? theme.buttonText;
+  const style = buttonAnchorStyle({ background, text, radius: props.radius, block: props.fullWidth, fontFamily: theme.fontFamily });
   return { background, style };
+}
+
+/** A single button: one slot holding the raw button HTML, in a table with the background on the cell for Outlook. */
+function renderButton(blockId: string, props: ButtonLook, raw: string, ctx: RenderContext, padding: Padding, bg: string): string {
+  const { background, style } = anchorStyleFor(props, ctx.theme);
+  ctx.slots.push({ id: blockId, kind: 'button', blockId, raw, anchorStyle: style });
+  const tableStyle = `border-collapse: separate;${props.fullWidth ? ' width: 100%;' : ''}`;
+  const button = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${props.align}" style="${tableStyle}"><tr><td align="center" bgcolor="${attr(opaqueColor(background, '#333333'))}" style="border-radius: ${props.radius}px; background-color: ${attr(background)};">${emailSlotToken(blockId)}</td></tr></table>`;
+  return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(props.align)}"${bg}>${button}</mj-text>`;
 }
 
 /** Plain text (with tags) as HTML: escaped, line breaks kept. */
@@ -316,13 +328,13 @@ function renderElement(block: BlockNode, ctx: RenderContext, width: number, nest
       const label = input.readText(block, 'label');
       if (!label.trim()) return '';
       const href = input.readText(block, 'href');
-      const { background, style } = anchorStyleFor(block, theme);
-      ctx.slots.push({ id: block.id, kind: 'button', blockId: block.id, raw: buttonRawHtml(label, href), anchorStyle: style });
-      const radius = `${block.props.radius}px`;
-      const tableAlign = block.props.align === 'center' ? 'center' : block.props.align;
-      const tableStyle = `border-collapse: separate;${block.props.fullWidth ? ' width: 100%;' : ''}`;
-      const button = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${tableAlign}" style="${tableStyle}"><tr><td align="center" bgcolor="${attr(opaqueColor(background, '#333333'))}" style="border-radius: ${radius}; background-color: ${attr(background)};">${emailSlotToken(block.id)}</td></tr></table>`;
-      return `<mj-text padding="${paddingAttr(padding)}" align="${textAlign(block.props.align)}"${bg}>${button}</mj-text>`;
+      return renderButton(block.id, block.props, buttonRawHtml(label, href), ctx, padding, bg);
+    }
+    case 'files': {
+      const shareId = sanitizeShareId(block.props.shareId);
+      if (!shareId) return '';
+      const label = input.readText(block, 'label').trim() || FILES_DEFAULT_LABELS.en;
+      return renderButton(block.id, block.props, buttonRawHtml(label, filesLinkTagRaw(shareId)), ctx, padding, bg);
     }
     case 'image': {
       const rawSrc = input.readText(block, 'src').trim();
